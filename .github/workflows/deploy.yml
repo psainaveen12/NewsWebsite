@@ -40,11 +40,14 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null
+          echo "Loaded SSH key fingerprint:"
+          ssh-keygen -lf ~/.ssh/id_rsa
           ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2 host
         run: |
           REMOTE_PATH="${DEPLOY_PATH:-\$HOME/apps/ieltstask}"
-          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "cd \"$REMOTE_PATH\" && DEPLOY_BRANCH=\"$DEPLOY_BRANCH\" bash scripts/deploy.sh \"$DEPLOY_BRANCH\""
+          ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "cd \"$REMOTE_PATH\" && DEPLOY_BRANCH=\"$DEPLOY_BRANCH\" bash scripts/deploy.sh \"$DEPLOY_BRANCH\""
