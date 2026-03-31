@@ -40,7 +40,14 @@ require_env_vars() {
 }
 
 docker_compose() {
-  docker compose --project-directory "$PROJECT_ROOT" --file "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  if docker compose version >/dev/null 2>&1; then
+    docker compose --project-directory "$PROJECT_ROOT" --file "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose --project-directory "$PROJECT_ROOT" --file "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  else
+    echo "Docker Compose is not installed. Install the Compose plugin or docker-compose first." >&2
+    exit 1
+  fi
 }
 
 timestamp() {

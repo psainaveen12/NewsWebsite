@@ -2,12 +2,14 @@
 
 ## AWS EC2 Provisioning
 
-1. Launch an Ubuntu 24.04 LTS or 22.04 LTS EC2 instance.
+1. Launch an Ubuntu 24.04 / 22.04 LTS or Amazon Linux EC2 instance.
 2. Choose an instance size that can comfortably run Docker, MariaDB, WordPress, and Caddy on one host.
    A good baseline is `t3.medium` or larger for production traffic.
 3. Use a security group that allows inbound `22`, `80`, and `443`.
 4. Attach storage sized for WordPress uploads, database growth, and local backups.
-5. Associate your SSH key pair and connect as `ubuntu`.
+5. Associate your SSH key pair and connect as:
+   - `ubuntu` for Ubuntu AMIs
+   - `ec2-user` for Amazon Linux AMIs
 
 ## Initial Host Bootstrap
 
@@ -29,8 +31,9 @@ sudo UFW_FORCE_ENABLE=true bash scripts/bootstrap-ec2-host.sh
 This bootstrap:
 
 - installs Docker Engine and the Compose plugin
-- enables `ufw` and `fail2ban`
-- enables unattended upgrades
+- enables the host firewall (`ufw` on Ubuntu, `firewalld` on Amazon Linux)
+- enables `fail2ban` when available
+- enables unattended upgrades or the native automatic update timer
 - creates swap if the host does not already have it
 - prepares default app and backup directories
 
@@ -75,7 +78,7 @@ bash scripts/healthcheck.sh --external
 After WordPress itself is installed and reachable, install the host cron jobs:
 
 ```bash
-sudo APP_USER=ubuntu APP_DIR=/home/ubuntu/apps/ieltstask bash scripts/install-cron-jobs.sh
+sudo APP_USER=$(whoami) APP_DIR=$HOME/apps/ieltstask bash scripts/install-cron-jobs.sh
 ```
 
 This installs jobs for:
@@ -89,10 +92,10 @@ This installs jobs for:
 
 Set these repository secrets before using the deploy workflow:
 
-- `SSH_HOST`
-- `SSH_PORT`
-- `SSH_USER`
-- `SSH_PRIVATE_KEY`
+- `EC2_HOST` or `SSH_HOST`
+- `EC2_SSH_PORT` or `SSH_PORT`
+- `EC2_SSH_USER` or `SSH_USER`
+- `EC2_SSH_KEY` or `SSH_PRIVATE_KEY`
 - `DEPLOY_PATH` (optional, if the repo is not located at `~/apps/ieltstask`)
 
 ## Post-Bootstrap Notes

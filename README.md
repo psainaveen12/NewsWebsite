@@ -1,6 +1,6 @@
 # IELTSTask EC2 Production Stack
 
-Production-ready starter repository for [https://www.ieltstask.com](https://www.ieltstask.com), built for a self-hosted WordPress deployment on a single AWS EC2 Ubuntu instance with no external database or other required AWS managed services.
+Production-ready starter repository for [https://www.ieltstask.com](https://www.ieltstask.com), built for a self-hosted WordPress deployment on a single AWS EC2 instance with no external database or other required AWS managed services.
 
 This repository is designed to support:
 
@@ -49,7 +49,7 @@ This repository is designed to support:
 
 1. Copy `.env.example` to `.env`.
 2. Replace every placeholder secret and email value.
-3. Provision the AWS EC2 Ubuntu host by following [docs/server-setup.md](docs/server-setup.md).
+3. Provision the AWS EC2 host by following [docs/server-setup.md](docs/server-setup.md).
 4. Clone this repo onto the VM at `~/apps/ieltstask`.
 5. Run `bash scripts/preflight.sh`.
 6. Run `docker compose up -d`.
@@ -61,7 +61,7 @@ This repository is designed to support:
 ## Deployment Flow
 
 - Pushes to `main` and `awsPlatformDeployTest` trigger `.github/workflows/deploy.yml`.
-- The workflow connects to the server with `SSH_HOST`, `SSH_PORT`, `SSH_USER`, `SSH_PRIVATE_KEY`, and optionally `DEPLOY_PATH`.
+- The workflow connects to the server with `EC2_HOST` / `SSH_HOST`, `EC2_SSH_PORT` / `SSH_PORT`, `EC2_SSH_USER` / `SSH_USER`, `EC2_SSH_KEY` / `SSH_PRIVATE_KEY`, and optionally `DEPLOY_PATH`.
 - The remote server runs `bash scripts/deploy.sh`, which pulls the latest code and refreshes the Compose stack.
 
 ## Local Validation
