@@ -12,9 +12,16 @@ get_header();
 	<p><?php esc_html_e('The page may have moved during migration. Check redirect mappings or search for the topic below.', 'ieltstask-theme'); ?></p>
 </section>
 
-<article class="post-card">
-	<?php get_search_form(); ?>
-</article>
+<div class="content-grid">
+	<div class="content-primary">
+		<article class="post-card">
+			<?php ieltstask_breadcrumbs(); ?>
+			<?php get_search_form(); ?>
+		</article>
+	</div>
+
+	<?php get_sidebar(); ?>
+</div>
 
 <?php
 get_footer();

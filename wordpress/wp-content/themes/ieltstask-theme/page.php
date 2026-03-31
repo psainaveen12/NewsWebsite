@@ -8,13 +8,20 @@ get_header();
 while (have_posts()) :
 	the_post();
 	?>
-	<article <?php post_class('article-card'); ?>>
-		<h1><?php the_title(); ?></h1>
+	<div class="content-grid">
+		<div class="content-primary">
+			<article <?php post_class('article-card'); ?>>
+				<?php ieltstask_breadcrumbs(); ?>
+				<h1><?php the_title(); ?></h1>
 
-		<div class="page-content">
-			<?php the_content(); ?>
+				<div class="page-content">
+					<?php the_content(); ?>
+				</div>
+			</article>
 		</div>
-	</article>
+
+		<?php get_sidebar(); ?>
+	</div>
 	<?php
 endwhile;
 
