@@ -1,0 +1,91 @@
+services:
+  db:
+    image: mariadb:11.4
+    container_name: ${COMPOSE_PROJECT_NAME:-ieltstask}-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=256M
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - backend
+
+  wordpress:
+    image: wordpress:php8.3-apache
+    container_name: ${COMPOSE_PROJECT_NAME:-ieltstask}-wordpress
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX}
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME', '${WP_HOME}');
+        define('WP_SITEURL', '${WP_SITEURL}');
+        define('FORCE_SSL_ADMIN', true);
+        define('DISALLOW_FILE_EDIT', true);
+        define('AUTOSAVE_INTERVAL', 300);
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            $$_SERVER['HTTPS'] = 'on';
+        }
+    volumes:
+      - wp_data:/var/www/html
+      - ./wordpress/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+      - ./wordpress/wp-content/themes/ieltstask-theme:/var/www/html/wp-content/themes/ieltstask-theme:ro
+    networks:
+      - backend
+      - frontend
+
+  caddy:
+    image: caddy:2
+    container_name: ${COMPOSE_PROJECT_NAME:-ieltstask}-caddy
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - wordpress
+    environment:
+      PRIMARY_DOMAIN: ${PRIMARY_DOMAIN}
+      APEX_DOMAIN: ${APEX_DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - frontend
+
+volumes:
+  caddy_config:
+  caddy_data:
+  db_data:
+  wp_data:
+
+networks:
+  backend:
+  frontend:
