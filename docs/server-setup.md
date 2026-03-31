@@ -1,64 +1,103 @@
 # Server Setup
 
-## Oracle Cloud VM Provisioning
+## AWS EC2 Provisioning
 
-1. Create an Ubuntu LTS VM on Oracle Cloud Always Free, ideally Ampere A1 Flex.
-2. Attach a public IP.
-3. Upload your SSH public key during provisioning.
-4. Allow inbound ports `22`, `80`, and `443` in the OCI security list or network security group.
-5. SSH in and update the host:
+1. Launch an Ubuntu 24.04 LTS or 22.04 LTS EC2 instance.
+2. Choose an instance size that can comfortably run Docker, MariaDB, WordPress, and Caddy on one host.
+   A good baseline is `t3.medium` or larger for production traffic.
+3. Use a security group that allows inbound `22`, `80`, and `443`.
+4. Attach storage sized for WordPress uploads, database growth, and local backups.
+5. Associate your SSH key pair and connect as `ubuntu`.
 
-```bash
-ssh ubuntu@YOUR_SERVER_IP
-sudo apt update && sudo apt upgrade -y
-sudo reboot
-```
+## Initial Host Bootstrap
 
-## Install Docker and Base Packages
-
-Run this script as root on the VM:
-
-```bash
-sudo bash scripts/install-docker-ubuntu.sh
-```
-
-It installs Docker Engine, the Compose plugin, Git, curl prerequisites, and adds the default server user to the `docker` group.
-
-## Hardening Baseline
-
-Run:
-
-```bash
-sudo UFW_FORCE_ENABLE=true bash scripts/harden-ubuntu.sh
-```
-
-This sets up:
-
-- `ufw`
-- `fail2ban`
-- Open ports `22`, `80`, and `443`
-
-## App Directory Layout
-
-Clone the repo on the server at:
+Clone the repo first:
 
 ```bash
 mkdir -p ~/apps/ieltstask
 cd ~/apps/ieltstask
 git clone YOUR_REPO_URL .
+```
+
+Then run the EC2 bootstrap as root:
+
+```bash
+cd ~/apps/ieltstask
+sudo UFW_FORCE_ENABLE=true bash scripts/bootstrap-ec2-host.sh
+```
+
+This bootstrap:
+
+- installs Docker Engine and the Compose plugin
+- enables `ufw` and `fail2ban`
+- enables unattended upgrades
+- creates swap if the host does not already have it
+- prepares default app and backup directories
+
+## Configure The App
+
+Create your runtime environment file:
+
+```bash
+cd ~/apps/ieltstask
 cp .env.example .env
 ```
 
-Fill in `.env`, then start the stack:
+Update every placeholder value in `.env`, especially:
+
+- all database passwords
+- all WordPress salts and keys
+- domain and email settings
+- backup location if you do not want the default
+
+Validate before starting:
+
+```bash
+bash scripts/preflight.sh
+```
+
+## Start The Stack
 
 ```bash
 docker compose up -d
 docker compose ps
+bash scripts/healthcheck.sh
 ```
+
+Once DNS points at the instance and TLS is live, you can also run:
+
+```bash
+bash scripts/healthcheck.sh --external
+```
+
+## Install Ongoing Cron Jobs
+
+After WordPress itself is installed and reachable, install the host cron jobs:
+
+```bash
+sudo APP_USER=ubuntu APP_DIR=/home/ubuntu/apps/ieltstask bash scripts/install-cron-jobs.sh
+```
+
+This installs jobs for:
+
+- database backups
+- WordPress content backups
+- `wp cron event run --due-now`
+- production health checks
+
+## GitHub Actions Deployment Secrets
+
+Set these repository secrets before using the deploy workflow:
+
+- `SSH_HOST`
+- `SSH_PORT`
+- `SSH_USER`
+- `SSH_PRIVATE_KEY`
+- `DEPLOY_PATH` (optional, if the repo is not located at `~/apps/ieltstask`)
 
 ## Post-Bootstrap Notes
 
-- Keep MariaDB private. Do not publish a DB port.
+- Keep MariaDB private. Do not publish a database port.
 - Use SSH keys only.
 - Add a second WordPress admin account for recovery.
-- Schedule regular OS updates.
+- Test restore steps before launch, not after.

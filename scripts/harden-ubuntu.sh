@@ -9,6 +9,18 @@ fi
 apt update
 apt install -y ufw fail2ban
 
+install -m 0755 -d /etc/fail2ban/jail.d
+cat >/etc/fail2ban/jail.d/sshd.local <<'EOF'
+[sshd]
+enabled = true
+maxretry = 5
+findtime = 10m
+bantime = 1h
+EOF
+
+ufw default deny incoming
+ufw default allow outgoing
+
 ufw allow OpenSSH
 ufw allow 80/tcp
 ufw allow 443/tcp

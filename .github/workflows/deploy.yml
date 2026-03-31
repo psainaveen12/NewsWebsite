@@ -4,10 +4,16 @@ on:
   push:
     branches:
       - main
+      - awsPlatformDeployTest
   workflow_dispatch:
+    inputs:
+      deploy_branch:
+        description: Branch to deploy
+        required: false
+        default: main
 
 concurrency:
-  group: ieltstask-production
+  group: ieltstask-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -25,14 +31,13 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy to Oracle VM
+      - name: Deploy to EC2 host
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
-          DEPLOY_BRANCH: main
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_branch || github.ref_name }}
         run: |
-          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "
-            cd ~/apps/ieltstask &&
-            DEPLOY_BRANCH=$DEPLOY_BRANCH bash scripts/deploy.sh
-          "
+          REMOTE_PATH="${DEPLOY_PATH:-\$HOME/apps/ieltstask}"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "cd \"$REMOTE_PATH\" && DEPLOY_BRANCH=\"$DEPLOY_BRANCH\" bash scripts/deploy.sh \"$DEPLOY_BRANCH\""

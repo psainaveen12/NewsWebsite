@@ -10,12 +10,12 @@ TARGET_DIR="$(backup_root)/wp"
 STAMP="$(timestamp)"
 OUTPUT_FILE="$TARGET_DIR/wp-content-$STAMP.tar.gz"
 
-mkdir -p "$TARGET_DIR"
+ensure_directory "$TARGET_DIR"
 docker_compose exec -T wordpress sh -lc '
   set -eu
   cd /var/www/html
   paths=""
-  for path in wp-content/uploads wp-content/plugins wp-content/themes wp-content/mu-plugins; do
+  for path in wp-content/uploads wp-content/plugins; do
     if [ -e "$path" ]; then
       paths="$paths $path"
     fi

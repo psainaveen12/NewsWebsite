@@ -18,8 +18,10 @@ if [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
 fi
 
 git pull --ff-only origin "$BRANCH"
+bash "$PROJECT_ROOT/scripts/preflight.sh"
 docker_compose config -q
 docker_compose pull
 docker_compose up -d --remove-orphans
+bash "$PROJECT_ROOT/scripts/healthcheck.sh"
 docker image prune -f
 docker_compose ps

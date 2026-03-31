@@ -1,14 +1,24 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: mariadb:11.4
     container_name: ${COMPOSE_PROJECT_NAME:-ieltstask}-db
+    init: true
     restart: unless-stopped
+    stop_grace_period: 1m
     env_file:
       - .env
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --innodb-buffer-pool-size=256M
+      - --transaction-isolation=READ-COMMITTED
+      - --binlog-format=ROW
     environment:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
@@ -24,11 +34,14 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - backend
+    logging: *default-logging
 
   wordpress:
     image: wordpress:php8.3-apache
     container_name: ${COMPOSE_PROJECT_NAME:-ieltstask}-wordpress
+    init: true
     restart: unless-stopped
+    stop_grace_period: 1m
     env_file:
       - .env
     depends_on:
@@ -44,28 +57,88 @@ services:
       WORDPRESS_CONFIG_EXTRA: |
         define('WP_HOME', '${WP_HOME}');
         define('WP_SITEURL', '${WP_SITEURL}');
+        define('WP_ENVIRONMENT_TYPE', '${WP_ENVIRONMENT_TYPE}');
         define('FORCE_SSL_ADMIN', true);
         define('DISALLOW_FILE_EDIT', true);
+        define('FS_METHOD', 'direct');
         define('AUTOSAVE_INTERVAL', 300);
+        define('WP_POST_REVISIONS', 20);
+        define('EMPTY_TRASH_DAYS', 14);
+        define('WP_MEMORY_LIMIT', '256M');
+        define('WP_MAX_MEMORY_LIMIT', '512M');
+        define('WP_AUTO_UPDATE_CORE', 'minor');
+        define('DISABLE_WP_CRON', true);
+        define('WP_DEBUG_DISPLAY', false);
+        define('AUTH_KEY', '${AUTH_KEY}');
+        define('SECURE_AUTH_KEY', '${SECURE_AUTH_KEY}');
+        define('LOGGED_IN_KEY', '${LOGGED_IN_KEY}');
+        define('NONCE_KEY', '${NONCE_KEY}');
+        define('AUTH_SALT', '${AUTH_SALT}');
+        define('SECURE_AUTH_SALT', '${SECURE_AUTH_SALT}');
+        define('LOGGED_IN_SALT', '${LOGGED_IN_SALT}');
+        define('NONCE_SALT', '${NONCE_SALT}');
         if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
             $$_SERVER['HTTPS'] = 'on';
         }
+        if (isset($$_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $$_SERVER['REMOTE_ADDR'] = trim(explode(',', $$_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+        }
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "php -r '$$fp = @fsockopen(\"127.0.0.1\", 80); if (! $$fp) { exit(1); } fclose($$fp);'"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
     volumes:
       - wp_data:/var/www/html
       - ./wordpress/php/custom.ini:/usr/local/etc/php/conf.d/custom.ini:ro
       - ./wordpress/wp-content/themes/ieltstask-theme:/var/www/html/wp-content/themes/ieltstask-theme:ro
+      - ./wordpress/wp-content/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
     networks:
       - backend
       - frontend
+    logging: *default-logging
+
+  wpcli:
+    image: wordpress:cli-php8.3
+    container_name: ${COMPOSE_PROJECT_NAME:-ieltstask}-wpcli
+    profiles:
+      - tools
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: ${DB_NAME}
+      WORDPRESS_DB_USER: ${DB_USER}
+      WORDPRESS_DB_PASSWORD: ${DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX}
+    entrypoint: ["wp"]
+    working_dir: /var/www/html
+    volumes:
+      - wp_data:/var/www/html
+      - ./wordpress/wp-content/themes/ieltstask-theme:/var/www/html/wp-content/themes/ieltstask-theme:ro
+      - ./wordpress/wp-content/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+    networks:
+      - backend
+    logging: *default-logging
 
   caddy:
     image: caddy:2
     container_name: ${COMPOSE_PROJECT_NAME:-ieltstask}-caddy
+    init: true
     restart: unless-stopped
     env_file:
       - .env
     depends_on:
-      - wordpress
+      wordpress:
+        condition: service_healthy
     environment:
       PRIMARY_DOMAIN: ${PRIMARY_DOMAIN}
       APEX_DOMAIN: ${APEX_DOMAIN}
@@ -79,6 +152,7 @@ services:
       - caddy_config:/config
     networks:
       - frontend
+    logging: *default-logging
 
 volumes:
   caddy_config:
@@ -88,4 +162,5 @@ volumes:
 
 networks:
   backend:
+    internal: true
   frontend:

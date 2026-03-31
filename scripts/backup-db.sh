@@ -11,7 +11,7 @@ TARGET_DIR="$(backup_root)/db"
 STAMP="$(timestamp)"
 OUTPUT_FILE="$TARGET_DIR/db-$STAMP.sql.gz"
 
-mkdir -p "$TARGET_DIR"
+ensure_directory "$TARGET_DIR"
 docker_compose exec -T db sh -c 'exec mariadb-dump --single-transaction --quick -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
   | gzip > "$OUTPUT_FILE"
 

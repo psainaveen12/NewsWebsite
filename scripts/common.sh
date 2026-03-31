@@ -24,6 +24,21 @@ load_env() {
   set +a
 }
 
+require_env_vars() {
+  local missing=0
+
+  for var_name in "$@"; do
+    if [ -z "${!var_name:-}" ]; then
+      echo "Missing required environment variable: $var_name" >&2
+      missing=1
+    fi
+  done
+
+  if [ "$missing" -ne 0 ]; then
+    exit 1
+  fi
+}
+
 docker_compose() {
   docker compose --project-directory "$PROJECT_ROOT" --file "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
@@ -34,4 +49,34 @@ timestamp() {
 
 backup_root() {
   printf '%s\n' "${BACKUP_ROOT:-$PROJECT_ROOT/backups}"
+}
+
+ensure_directory() {
+  mkdir -p "$1"
+}
+
+service_container_id() {
+  docker_compose ps -q "$1"
+}
+
+service_state() {
+  local container_id
+
+  container_id="$(service_container_id "$1")"
+  if [ -z "$container_id" ]; then
+    return 1
+  fi
+
+  docker inspect --format '{{.State.Status}}' "$container_id"
+}
+
+service_health() {
+  local container_id
+
+  container_id="$(service_container_id "$1")"
+  if [ -z "$container_id" ]; then
+    return 1
+  fi
+
+  docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id"
 }

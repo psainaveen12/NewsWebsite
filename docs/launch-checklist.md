@@ -2,10 +2,12 @@
 
 ## Infrastructure
 
-- DNS points to the Oracle VM
+- DNS points to the EC2 instance
 - `https://www.ieltstask.com` is live
 - `https://ieltstask.com` redirects permanently to `https://www.ieltstask.com`
 - `docker compose ps` shows healthy runtime services
+- `bash scripts/healthcheck.sh` passes locally
+- `bash scripts/healthcheck.sh --external` passes from the host
 - Persistent volumes are mounted and writable
 - Firewall and fail2ban are active
 
@@ -43,10 +45,10 @@
 - WordPress content backup runs successfully
 - Restore steps are understood
 - HTTPS uptime monitoring is active
+- Host cron jobs have been installed with `scripts/install-cron-jobs.sh`
 
-## Suggested Backup Cron Jobs
+## Suggested Backup And Runtime Automation
 
-```cron
-0 2 * * * cd /home/ubuntu/apps/ieltstask && bash scripts/backup-db.sh >> /home/ubuntu/backup.log 2>&1
-30 2 * * * cd /home/ubuntu/apps/ieltstask && bash scripts/backup-wp.sh >> /home/ubuntu/backup.log 2>&1
+```bash
+sudo APP_USER=ubuntu APP_DIR=/home/ubuntu/apps/ieltstask bash scripts/install-cron-jobs.sh
 ```

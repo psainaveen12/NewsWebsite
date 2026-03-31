@@ -15,7 +15,7 @@ fi
 cat "$INPUT_FILE" | docker_compose exec -T wordpress sh -lc '
   set -eu
   cd /var/www/html
-  rm -rf wp-content/uploads wp-content/plugins wp-content/themes wp-content/mu-plugins
+  rm -rf wp-content/uploads wp-content/plugins
   tar -xzf - -C .
 '
 
