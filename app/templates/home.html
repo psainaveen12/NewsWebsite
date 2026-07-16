@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Latest stories | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-kicker">Independent reading desk</div>
+  <h1>The signal,<br><em>without the noise.</em></h1>
+  <div class="hero-bottom">
+    <p>A focused collection of useful reporting, ideas, and analysis from across the web.</p>
+    <form class="search-form" action="/" method="get" role="search">
+      <label class="sr-only" for="search">Search articles</label>
+      <input id="search" name="q" value="{{ query }}" placeholder="Search the newsroom">
+      <button type="submit">Search</button>
+    </form>
+  </div>
+</section>
+
+<section class="feed-heading">
+  <div>
+    <span class="eyebrow">{% if query %}Search results{% else %}Current edition{% endif %}</span>
+    <h2>{% if query %}“{{ query }}”{% else %}Latest articles{% endif %}</h2>
+  </div>
+  <span class="article-count">{{ total }} stor{% if total == 1 %}y{% else %}ies{% endif %}</span>
+</section>
+
+{% if articles %}
+<section class="article-grid" aria-label="Articles">
+  {% for article in articles %}
+  <article class="article-card{% if loop.index == 1 and not query %} article-card--lead{% endif %}">
+    <a class="card-image" href="/articles/{{ article.slug }}" aria-label="Read {{ article.title }}">
+      {% if article.image_url %}
+        <img src="{{ article.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+      {% else %}
+        <span class="image-fallback"><i>{{ article.source_domain[:1]|upper }}</i></span>
+      {% endif %}
+    </a>
+    <div class="card-body">
+      <div class="card-meta">
+        <span>{{ article.source_name or article.source_domain }}</span>
+        <time>{{ article.published_at|display_date }}</time>
+      </div>
+      <h3><a href="/articles/{{ article.slug }}">{{ article.title }}</a></h3>
+      {% if article.description %}<p>{{ article.description }}</p>{% endif %}
+      <a class="read-link" href="/articles/{{ article.slug }}">Read summary <span>→</span></a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+
+{% if page_count > 1 %}
+<nav class="pagination" aria-label="Article pages">
+  {% if page > 1 %}<a href="/?q={{ query|urlencode }}&page={{ page - 1 }}">← Newer</a>{% else %}<span></span>{% endif %}
+  <span>Page {{ page }} of {{ page_count }}</span>
+  {% if page < page_count %}<a href="/?q={{ query|urlencode }}&page={{ page + 1 }}">Older →</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<section class="empty-state">
+  <span>Nothing filed yet</span>
+  <h2>{% if query %}No stories match that search.{% else %}The first edition is being prepared.{% endif %}</h2>
+  <p>{% if query %}Try a different word or return to the latest stories.{% else %}Sign in to the import desk to add article URLs.{% endif %}</p>
+  {% if query %}<a class="button" href="/">View all articles</a>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

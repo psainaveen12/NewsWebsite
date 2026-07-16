@@ -1,77 +1,178 @@
-# IELTSTask Production Stack
+# IELTSTask Newsroom
 
-Production-ready starter repository for [https://www.ieltstask.com](https://www.ieltstask.com), built from the production runbook requirements for a self-hosted WordPress deployment on Oracle Cloud Always Free.
+A Docker-native article curation application for `news.ieltstask.com`. An authenticated import-only admin submits one or many public blog article URLs; the application safely extracts publisher metadata, stores it in PostgreSQL, and presents it through a responsive public newsroom.
 
-This repository is designed to support:
+The stack is provider-neutral. It requires only a public Linux host with Git, Docker Engine, Docker Compose, and ports `80`/`443` available.
 
-- WordPress + MariaDB running on Docker Compose
-- Caddy for HTTPS, compression, canonical redirects, and security headers
-- GitHub Actions deployment over SSH
-- Blogger migration planning for blog ID `1194349556968361444`
-- Migration notes from the current Blogger theme XML, including Search Console, GA4, and AdSense identifiers
-- WordPress REST API publishing with Application Passwords
-- Search visibility setup for Search Console, Bing, IndexNow, XML sitemap, and `robots.txt`
-- Backups, restore workflows, launch gates, and rollback notes
+## What It Does
 
-## Included Deliverables
+- Imports one URL or up to 50 URLs per submission
+- Extracts title, description, lead image, author, publisher, publication date, and canonical URL
+- Updates matching canonical/source URLs instead of creating duplicates
+- Blocks private network targets, unsafe schemes, credential-bearing URLs, oversized responses, and unsafe redirects
+- Stores article metadata in a private PostgreSQL container
+- Displays searchable and paginated article cards plus article summary pages
+- Provides one restricted admin account with import-only functionality
+- Uses Caddy for automatic HTTPS on `news.ieltstask.com`
+- Includes health checks, CI, database backup/restore, and branch-driven deployment
 
-- `docker-compose.yml`
-- `.env.example`
-- `caddy/Caddyfile`
-- `wordpress/php/custom.ini`
-- `wordpress/wp-content/themes/ieltstask-theme/`
-- `scripts/install-docker-ubuntu.sh`
-- `scripts/harden-ubuntu.sh`
-- `scripts/deploy.sh`
-- `scripts/backup-db.sh`
-- `scripts/backup-wp.sh`
-- `scripts/restore-db.sh`
-- `scripts/restore-wp.sh`
-- `.github/workflows/deploy.yml`
-- `docs/production-runbook.md`
-- `docs/server-setup.md`
-- `docs/wordpress-setup.md`
-- `docs/blogger-migration-checklist.md`
-- `docs/blogger-theme-audit.md`
-- `docs/json-publishing.md`
-- `docs/search-visibility-checklist.md`
-- `docs/launch-checklist.md`
-- `docs/rollback-checklist.md`
+## Architecture
 
-## Quick Start
+```text
+Browser -> Caddy :80/:443 -> FastAPI app :8000 -> PostgreSQL :5432
+                            (private Docker networks)
+```
 
-1. Copy `.env.example` to `.env`.
-2. Replace every placeholder secret and email value.
-3. Provision the Oracle Ubuntu VM by following [docs/server-setup.md](docs/server-setup.md).
-4. Clone this repo onto the VM at `~/apps/ieltstask`.
-5. Run `docker compose up -d`.
-6. Point DNS only after the stack is healthy and HTTPS is ready.
-7. Complete WordPress installation, plugin setup, and Blogger migration by following the docs in `docs/`.
+Only Caddy publishes host ports. PostgreSQL is isolated on an internal Docker network. See [the full architecture](docs/full-e2e-architecture.md).
 
-## Deployment Flow
+## First Local Run
 
-- Pushes to `main` trigger `.github/workflows/deploy.yml`.
-- The workflow connects to the server with `SSH_HOST`, `SSH_PORT`, `SSH_USER`, and `SSH_PRIVATE_KEY`.
-- The remote server runs `bash scripts/deploy.sh`, which pulls the latest code and refreshes the Compose stack.
+```bash
+git checkout NewsWebsite-Docker
+cp .env.example .env
+```
 
-## Local Validation
+Edit `.env` and replace every placeholder. Generate secrets with:
 
-Useful checks before pushing:
+```bash
+openssl rand -hex 24
+openssl rand -hex 32
+```
 
-- `docker compose config`
-- `bash -n scripts/*.sh`
+For local HTTP testing, use:
 
-## Blogger Migration Context
+```env
+ENVIRONMENT=development
+APP_DOMAIN=localhost
+ALLOWED_HOSTS=localhost,127.0.0.1
+COOKIE_SECURE=false
+```
 
-- WordPress production URL: `https://www.ieltstask.com`
-- Blogger admin URL provided: `https://www.blogger.com/u/0/blog/posts/1194349556968361444`
-- Recommended import source: Google Takeout `feed.atom`
-- Existing Search Console token from Blogger XML: `6WbeH24Nl3cffMo0M_o9NYTXpI5weva3_Fknw0SP08`
-- Existing GA4 measurement ID from Blogger XML: `G-SCBVGKWD97`
-- Existing AdSense publisher ID from Blogger XML: `ca-pub-9276619150182367`
+Start the stack:
 
-## Notes
+```bash
+docker compose up -d --build
+docker compose ps
+```
 
-- Do not commit `.env`, database dumps, backups, SSH keys, or uploaded media.
-- This repo keeps deployment code in Git while persistent WordPress and MariaDB data live in Docker volumes.
-- The bundled `ieltstask-theme` is a lightweight starter theme so the site can be activated immediately after setup or migration.
+Open `http://localhost`. The admin login is at `http://localhost/login`.
+
+Stop without deleting data:
+
+```bash
+docker compose down
+```
+
+Delete the local database and all Docker volumes only when intentionally resetting:
+
+```bash
+docker compose down --volumes
+```
+
+## Admin Credentials
+
+The default admin username is configured as `sainaveennews`. Set the password only in the uncommitted `.env` file:
+
+```env
+ADMIN_USERNAME=sainaveennews
+ADMIN_PASSWORD=your-private-password
+SESSION_SECRET=at-least-32-random-characters
+```
+
+The password is intentionally not committed to Git. Because any password shared in chat should be considered exposed, rotate it before making the site public.
+
+The account can only access the import desk, submit article URLs, review import results, and open stored public article pages. There are no user-management, database-management, delete, or arbitrary-edit controls.
+
+## Deploy From Repository And Branch
+
+First deployment:
+
+```bash
+git clone --branch NewsWebsite-Docker --single-branch \
+  https://github.com/psainaveen12/NewsWebsite.git newswebsite
+cd newswebsite
+cp .env.example .env
+```
+
+Set production values in `.env`, including:
+
+```env
+ENVIRONMENT=production
+APP_DOMAIN=news.ieltstask.com
+ALLOWED_HOSTS=news.ieltstask.com
+COOKIE_SECURE=true
+TLS_EMAIL=puttisainaveen@gmail.com
+```
+
+Then deploy:
+
+```bash
+bash scripts/preflight.sh
+docker compose up -d --build
+bash scripts/healthcheck.sh
+```
+
+Every later deployment uses the branch name explicitly:
+
+```bash
+DEPLOY_BRANCH=NewsWebsite-Docker bash scripts/deploy.sh
+```
+
+The generic clone/update helper also accepts repository, branch, and deployment directory:
+
+```bash
+bash scripts/deploy-from-repo.sh \
+  https://github.com/psainaveen12/NewsWebsite.git \
+  NewsWebsite-Docker \
+  /opt/newswebsite
+```
+
+## Squarespace DNS
+
+Docker does not connect directly to Squarespace. Squarespace hosts the DNS record, while Caddy on the Docker host serves the subdomain and obtains its TLS certificate.
+
+In Squarespace Domains, add:
+
+| Type | Host | Value | TTL |
+|---|---|---|---|
+| `A` | `news` | Public IPv4 address of the Docker host | Automatic/default |
+
+If the host has a stable public IPv6 address, optionally add an `AAAA` record for `news`. Do not add both an old CNAME and the new A/AAAA record for the same host. Allow inbound TCP `80` and `443`, plus UDP `443` for HTTP/3.
+
+Full instructions and verification commands are in [deployment-and-dns.md](docs/deployment-and-dns.md).
+
+## Operations
+
+```bash
+# Logs
+docker compose logs -f app caddy db
+
+# Health
+bash scripts/healthcheck.sh
+
+# Backup
+bash scripts/backup-db.sh
+
+# Restore
+bash scripts/restore-db.sh backups/db/newswebsite-YYYY-MM-DD-HHMMSS.sql.gz
+
+# Tests
+python -m pip install -r requirements-dev.txt
+pytest -q
+```
+
+The `postgres_data` Docker volume is the source of truth. Keep encrypted database backups outside the application host for disaster recovery.
+
+## Repository Layout
+
+```text
+app/                    FastAPI application, templates, and styles
+caddy/Caddyfile         HTTPS reverse proxy configuration
+docker/                 Container startup and migration entrypoint
+migrations/             Versioned PostgreSQL schema migrations
+scripts/                Deploy, health, backup, and restore operations
+tests/                  Authentication, ingestion, display, and URL-safety tests
+docker-compose.yml      Complete application stack
+Dockerfile              Non-root application image
+docs/                   Architecture, security, DNS, and deployment guidance
+```

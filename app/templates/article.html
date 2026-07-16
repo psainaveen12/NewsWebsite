@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} | {{ app_name }}{% endblock %}
+
+{% block content %}
+<article class="article-detail">
+  <a class="back-link" href="/">← Back to latest</a>
+  <header class="article-detail-header">
+    <div class="article-source">{{ article.source_name or article.source_domain }}</div>
+    <h1>{{ article.title }}</h1>
+    <div class="article-byline">
+      {% if article.author %}<span>By {{ article.author }}</span>{% endif %}
+      <time>{{ article.published_at|display_date }}</time>
+    </div>
+  </header>
+
+  {% if article.image_url %}
+  <figure class="article-hero-image">
+    <img src="{{ article.image_url }}" alt="" referrerpolicy="no-referrer">
+  </figure>
+  {% endif %}
+
+  <div class="article-copy">
+    <span class="summary-label">Article summary</span>
+    {% if article.description %}
+      <p>{{ article.description }}</p>
+    {% else %}
+      <p>This article was indexed without a publisher-provided description.</p>
+    {% endif %}
+    <a class="source-button" href="{{ article.canonical_url or article.source_url }}" target="_blank" rel="noopener noreferrer nofollow">
+      Read the original article <span>↗</span>
+    </a>
+  </div>
+</article>
+{% endblock %}

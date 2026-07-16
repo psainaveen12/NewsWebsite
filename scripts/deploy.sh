@@ -5,21 +5,26 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 require_command docker
 require_command git
-load_env
 
-BRANCH="${DEPLOY_BRANCH:-${1:-main}}"
+BRANCH="${DEPLOY_BRANCH:-${1:-NewsWebsite-Docker}}"
+git check-ref-format --branch "$BRANCH" >/dev/null
 
 cd "$PROJECT_ROOT"
-git fetch origin "$BRANCH"
-
-CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-if [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
-  git checkout "$BRANCH"
+if [ ! -d .git ]; then
+  echo "Deployment directory is not a Git repository: $PROJECT_ROOT" >&2
+  exit 1
+fi
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Create $ENV_FILE from .env.example and set production secrets before deploying." >&2
+  exit 1
 fi
 
-git pull --ff-only origin "$BRANCH"
-docker_compose config -q
-docker_compose pull
+git fetch --prune origin "$BRANCH"
+git checkout "$BRANCH"
+git merge --ff-only "origin/$BRANCH"
+
+bash "$PROJECT_ROOT/scripts/preflight.sh"
+docker_compose build --pull
 docker_compose up -d --remove-orphans
-docker image prune -f
 docker_compose ps
+bash "$PROJECT_ROOT/scripts/healthcheck.sh"

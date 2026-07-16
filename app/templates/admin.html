@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Import desk | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="admin-header">
+  <div>
+    <span class="eyebrow">Admin · Import only</span>
+    <h1>Build the<br>next edition.</h1>
+  </div>
+  <p>Paste one public blog article URL per line. The importer collects the publisher’s title, image, description, author, date, and canonical URL.</p>
+</section>
+
+<section class="import-panel">
+  <form action="/admin/articles/import" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label for="urls">Article URLs</label>
+    <textarea id="urls" name="urls" rows="10" placeholder="https://example.com/article-one&#10;https://example.com/article-two" required></textarea>
+    <div class="import-actions">
+      <p>Up to 50 URLs. Existing articles are refreshed, never duplicated.</p>
+      <button class="button" type="submit">Import articles</button>
+    </div>
+  </form>
+</section>
+
+{% if error %}<div class="notice notice--error" role="alert">{{ error }}</div>{% endif %}
+
+{% if results %}
+<section class="results-section">
+  <div class="section-title"><span>Import report</span><strong>{{ results|length }} processed</strong></div>
+  <ol class="result-list">
+    {% for result in results %}
+    <li class="result result--{{ result.status }}">
+      <span class="result-status">{% if result.status == 'success' %}Saved{% else %}Failed{% endif %}</span>
+      <div><strong>{{ result.message }}</strong><small>{{ result.url }}</small></div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+<section class="stored-section">
+  <div class="section-title"><span>Recently stored</span><strong>{{ articles|length }} shown</strong></div>
+  {% if articles %}
+  <div class="stored-list">
+    {% for article in articles %}
+    <a href="/articles/{{ article.slug }}">
+      <span>{{ "%02d"|format(loop.index) }}</span>
+      <strong>{{ article.title }}</strong>
+      <small>{{ article.source_domain }}</small>
+      <i>→</i>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="stored-empty">No articles have been imported yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

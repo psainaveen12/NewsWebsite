@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Admin sign in | {{ app_name }}{% endblock %}
+
+{% block content %}
+<section class="auth-layout">
+  <div class="auth-intro">
+    <span class="eyebrow">Restricted access</span>
+    <h1>Newsroom<br>import desk.</h1>
+    <p>This account can only import article URLs and review stored article metadata.</p>
+  </div>
+  <form class="auth-card" action="/login" method="post">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <div>
+      <span class="form-number">01</span>
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" required autofocus>
+    </div>
+    <div>
+      <span class="form-number">02</span>
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% endif %}
+    <button class="button button--full" type="submit">Enter the newsroom</button>
+  </form>
+</section>
+{% endblock %}
