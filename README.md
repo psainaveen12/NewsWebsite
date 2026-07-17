@@ -9,18 +9,18 @@ A production-oriented, self-hosted news application for `news.ieltstask.com`. It
 - Smart import of Blogger Atom posts, pages, authors, dates, labels and threaded comments
 - Extracted Takeout images stored in a persistent Docker volume and rewritten into article content
 - HTML sanitization, archive traversal protection, zip-bomb limits and duplicate-safe re-imports
-- PostgreSQL, FastAPI, Nginx and Caddy running only in Docker
-- Automatic HTTPS for `news.ieltstask.com`
+- PostgreSQL, FastAPI and Cloudflare Tunnel running only in Docker
+- Cloudflare-managed HTTPS for `news.ieltstask.com` without public origin ports
 - No cloud-provider-specific service or external database dependency
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  V[Public visitor] --> C[Caddy HTTPS]
+  V[Public visitor] --> C[Cloudflare HTTPS]
   A[Private administrator] --> C
-  C --> N[Nginx gateway]
-  N --> F[FastAPI application]
+  C --> T[Cloudflare Tunnel]
+  T --> F[FastAPI application]
   F --> P[(PostgreSQL)]
   F --> M[(Persistent media volume)]
   T[Google Takeout ZIP] --> F
@@ -38,7 +38,6 @@ Set unique secrets in `.env`. For local HTTP keep:
 
 ```dotenv
 APP_ENV=development
-APP_ADDRESS=http://localhost
 APP_BASE_URL=http://localhost
 ```
 
@@ -72,11 +71,14 @@ cp .env.example .env
 Set these production values:
 
 ```dotenv
+COMPOSE_PROFILES=cloudflare
 APP_ENV=production
-APP_ADDRESS=news.ieltstask.com
 APP_BASE_URL=https://news.ieltstask.com
 APP_DOMAIN=news.ieltstask.com
+CLOUDFLARE_TUNNEL_TOKEN_FILE=./secrets/cloudflare-tunnel-token
 ```
+
+Create a remotely managed Cloudflare Tunnel, publish `news.ieltstask.com` to `http://app:8000`, and save its token in `secrets/cloudflare-tunnel-token`.
 
 Generate secrets instead of reusing examples:
 
@@ -109,15 +111,9 @@ bash scripts/deploy-from-repo.sh \
   /opt/newswebsite
 ```
 
-## Squarespace DNS
+## Cloudflare DNS And Tunnel
 
-Keep the existing root and `www` Squarespace records unchanged. Add only:
-
-| Type | Host | Value | TTL |
-|---|---|---|---|
-| `A` | `news` | Public IPv4 address of the Docker host | Default |
-
-Remove any conflicting `news` A or CNAME record. Open TCP `80` and `443` on the host. Caddy obtains the certificate after DNS resolves.
+Add `ieltstask.com` to Cloudflare and use the Cloudflare nameservers at the domain registrar. Preserve the existing root and `www` DNS records. Creating the tunnel public hostname automatically creates the proxied `news` CNAME; no Elastic IP or inbound web ports are needed.
 
 Full steps: [docs/deployment-and-dns.md](docs/deployment-and-dns.md).
 
@@ -139,7 +135,7 @@ bash scripts/backup-db.sh
 bash scripts/backup-media.sh
 bash scripts/restore-db.sh backups/db/news-TIMESTAMP.sql.gz
 bash scripts/restore-media.sh backups/media/media-TIMESTAMP.tar.gz
-docker compose logs --tail=100 app nginx caddy db
+docker compose logs --tail=100 app cloudflared db
 ```
 
 Run tests:

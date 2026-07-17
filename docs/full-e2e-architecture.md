@@ -2,26 +2,25 @@
 
 ## Runtime Boundary
 
-The stack is provider-neutral. A Docker host with a stable public IPv4 address is the only infrastructure dependency.
+The application and database are provider-neutral. Cloudflare Tunnel supplies public ingress without exposing the Docker host or requiring a stable public IPv4 address.
 
 ```mermaid
 flowchart TB
   subgraph Internet
     U[Public readers]
     N[Private administrator]
-    D[Squarespace DNS]
+    C[Cloudflare edge and DNS]
   end
-  D -->|news.ieltstask.com A record| C
-  U -->|HTTPS| C[Caddy container]
+  U -->|HTTPS| C
   N -->|HTTPS login and ZIP upload| C
-  C -->|Internal HTTP| NG[Nginx container]
-  NG -->|Internal HTTP| API[FastAPI container]
+  C -->|Encrypted outbound tunnel| T[cloudflared container]
+  T -->|Docker frontend network| API[FastAPI container]
   API -->|SQL| DB[(PostgreSQL volume)]
   API -->|Images| MEDIA[(Media volume)]
   API -->|Temporary ZIP| MEDIA
 ```
 
-Only Caddy publishes host ports. Nginx and the application are reachable only on the Docker `frontend` network. PostgreSQL is attached exclusively to the internal `backend` network.
+No container publishes a public host port. The application has a loopback-only local binding and is reachable by `cloudflared` on the Docker `frontend` network. PostgreSQL is attached exclusively to the internal `backend` network.
 
 ## Takeout Data Flow
 
@@ -61,7 +60,8 @@ The private surface is limited to `/login`, `/admin`, `/admin/imports` and impor
 ## Reliability
 
 - Alembic migrations run before every application start.
-- PostgreSQL, application and Nginx health checks gate dependent containers.
+- PostgreSQL and application health checks gate the tunnel container.
+- Cloudflare Tunnel reconnects automatically and the container restarts unless stopped.
 - Restarted in-flight imports are marked failed instead of remaining permanently processing.
 - Database and media have separate backup/restore procedures.
 - The deployment script only fast-forwards the selected Git branch.

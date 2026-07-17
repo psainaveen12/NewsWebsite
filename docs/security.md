@@ -33,10 +33,11 @@ The requested initial password must be stored only in the production `.env`. Rot
 - Application container runs as UID/GID `10001`
 - Read-only application filesystem with dedicated temporary and media mounts
 - Linux capabilities dropped from the application
-- Caddy publishes only HTTP/HTTPS
+- Cloudflare Tunnel uses outbound-only connectivity; no public origin port is published
+- The local application port is bound only to host loopback
 - Security headers and content security policy are applied to every response
 - Admin pages receive `no-store` and `noindex`
 
 ## Secrets
 
-Never commit `.env`, Takeout exports, backups, database dumps, SSH keys or credentials. Use at least 32 random bytes for `SESSION_SECRET` and independent random PostgreSQL credentials.
+Never commit `.env`, Cloudflare tunnel tokens, Takeout exports, backups, database dumps, SSH keys or credentials. Use at least 32 random bytes for `SESSION_SECRET` and independent random PostgreSQL credentials.

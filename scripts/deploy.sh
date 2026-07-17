@@ -18,6 +18,5 @@ git pull --ff-only origin "$BRANCH"
 bash "$PROJECT_ROOT/scripts/preflight.sh"
 docker_compose build --pull
 docker_compose up -d --remove-orphans
-docker_compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 bash "$PROJECT_ROOT/scripts/healthcheck.sh"
 docker image prune -f

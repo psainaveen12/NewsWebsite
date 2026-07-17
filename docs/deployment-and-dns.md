@@ -1,16 +1,25 @@
-# Docker Deployment And Squarespace DNS
+# Docker Deployment And Cloudflare Tunnel
 
 ## Host Requirements
 
-- Public Linux host with a stable IPv4 address
+- Linux host with outbound Internet access
 - Git, Docker Engine and the Docker Compose plugin
 - Recommended minimum: 2 GB RAM and 20 GB disk plus room for imported media
-- TCP ports `80` and `443` open inbound
-- UDP port `443` optional for HTTP/3
+- Outbound access to Cloudflare; no inbound HTTP or HTTPS ports are required
 
-No cloud-provider account or managed database is required.
+The database and media remain on the Docker host. A stable public IPv4 is not required.
 
-## Deploy The Requested Branch
+## Configure Cloudflare
+
+1. Add `ieltstask.com` to Cloudflare and update the domain nameservers at Squarespace Domains.
+2. Preserve the existing root (`@`) and `www` records so `www.ieltstask.com` remains unchanged.
+3. In Cloudflare, open **Networking > Tunnels** and create a remotely managed tunnel named `newswebsite`.
+4. Add a published application with hostname `news.ieltstask.com` and service `http://app:8000`.
+5. Copy the tunnel token. The hostname route automatically creates a proxied CNAME to the tunnel.
+
+The token can start the tunnel and must be treated as a secret.
+
+## Deploy The Branch
 
 ```bash
 git clone --branch NewsWebsiteDocker --single-branch \
@@ -18,51 +27,32 @@ git clone --branch NewsWebsiteDocker --single-branch \
   /opt/newswebsite
 cd /opt/newswebsite
 cp .env.example .env
+mkdir -p secrets
+printf '%s' 'PASTE_TUNNEL_TOKEN_HERE' > secrets/cloudflare-tunnel-token
+chmod 600 secrets/cloudflare-tunnel-token
 ```
 
-Edit `.env` and set:
+Set the production values in `.env`:
 
 ```dotenv
+COMPOSE_PROFILES=cloudflare
 APP_ENV=production
-APP_ADDRESS=news.ieltstask.com
 APP_BASE_URL=https://news.ieltstask.com
 APP_DOMAIN=news.ieltstask.com
-TLS_EMAIL=puttisainaveen@gmail.com
+CLOUDFLARE_TUNNEL_TOKEN_FILE=./secrets/cloudflare-tunnel-token
 ```
 
-Also replace PostgreSQL, session and admin placeholders with unique values. The admin password must not be committed.
+Replace every PostgreSQL, session and admin placeholder with an independent random value. Then deploy:
 
 ```bash
 bash scripts/preflight.sh
-docker compose up -d --build
+docker compose --profile cloudflare up -d --build --remove-orphans
 bash scripts/healthcheck.sh
 ```
 
-## Squarespace DNS
+## Security Group
 
-In the Squarespace Domains dashboard:
-
-1. Open `ieltstask.com`.
-2. Open DNS settings.
-3. Leave the root (`@`) and `www` records unchanged so `www.ieltstask.com` continues using the existing Blogger/Squarespace configuration.
-4. Remove a conflicting `news` CNAME or A record if one exists.
-5. Add the record below.
-
-| Field | Value |
-|---|---|
-| Type | `A` |
-| Host/Name | `news` |
-| Data/Value | Stable public IPv4 of the Docker host |
-| TTL | Automatic/default |
-
-Verify after propagation:
-
-```bash
-dig +short news.ieltstask.com A
-curl -I https://news.ieltstask.com/healthz
-```
-
-The DNS result must equal the Docker host IPv4. Caddy automatically requests TLS after the record resolves and ports `80`/`443` reach the host.
+Cloudflare Tunnel makes outbound connections, so EC2 inbound ports `80` and `443` can remain closed. Restrict inbound SSH to your own IP. PostgreSQL and FastAPI are never bound to a public host interface; the local development binding uses `127.0.0.1` only.
 
 ## Updates
 
@@ -71,11 +61,11 @@ cd /opt/newswebsite
 DEPLOY_BRANCH=NewsWebsiteDocker bash scripts/deploy.sh
 ```
 
-## Production Verification
+## Verification
 
 ```bash
-docker compose ps
-docker compose logs --tail=100 app nginx caddy db
+docker compose --profile cloudflare ps
+docker compose --profile cloudflare logs --tail=100 app cloudflared db
 curl -fsS https://news.ieltstask.com/healthz
 curl -I https://news.ieltstask.com/
 ```
