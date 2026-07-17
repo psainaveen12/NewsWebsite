@@ -9,7 +9,7 @@ A production-oriented, self-hosted news application for `news.ieltstask.com`. It
 - Smart import of Blogger Atom posts, pages, authors, dates, labels and threaded comments
 - Extracted Takeout images stored in a persistent Docker volume and rewritten into article content
 - HTML sanitization, archive traversal protection, zip-bomb limits and duplicate-safe re-imports
-- PostgreSQL, FastAPI and Caddy running only in Docker
+- PostgreSQL, FastAPI, Nginx and Caddy running only in Docker
 - Automatic HTTPS for `news.ieltstask.com`
 - No cloud-provider-specific service or external database dependency
 
@@ -19,7 +19,8 @@ A production-oriented, self-hosted news application for `news.ieltstask.com`. It
 flowchart LR
   V[Public visitor] --> C[Caddy HTTPS]
   A[Private administrator] --> C
-  C --> F[FastAPI application]
+  C --> N[Nginx gateway]
+  N --> F[FastAPI application]
   F --> P[(PostgreSQL)]
   F --> M[(Persistent media volume)]
   T[Google Takeout ZIP] --> F
@@ -138,7 +139,7 @@ bash scripts/backup-db.sh
 bash scripts/backup-media.sh
 bash scripts/restore-db.sh backups/db/news-TIMESTAMP.sql.gz
 bash scripts/restore-media.sh backups/media/media-TIMESTAMP.tar.gz
-docker compose logs --tail=100 app caddy db
+docker compose logs --tail=100 app nginx caddy db
 ```
 
 Run tests:

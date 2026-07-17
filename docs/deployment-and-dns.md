@@ -75,7 +75,7 @@ DEPLOY_BRANCH=NewsWebsiteDocker bash scripts/deploy.sh
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 app caddy db
+docker compose logs --tail=100 app nginx caddy db
 curl -fsS https://news.ieltstask.com/healthz
 curl -I https://news.ieltstask.com/
 ```

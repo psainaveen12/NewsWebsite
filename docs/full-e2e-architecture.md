@@ -14,13 +14,14 @@ flowchart TB
   D -->|news.ieltstask.com A record| C
   U -->|HTTPS| C[Caddy container]
   N -->|HTTPS login and ZIP upload| C
-  C -->|Internal HTTP| API[FastAPI container]
+  C -->|Internal HTTP| NG[Nginx container]
+  NG -->|Internal HTTP| API[FastAPI container]
   API -->|SQL| DB[(PostgreSQL volume)]
   API -->|Images| MEDIA[(Media volume)]
   API -->|Temporary ZIP| MEDIA
 ```
 
-Only Caddy publishes host ports. PostgreSQL is attached exclusively to the internal `backend` network. The application is not directly published.
+Only Caddy publishes host ports. Nginx and the application are reachable only on the Docker `frontend` network. PostgreSQL is attached exclusively to the internal `backend` network.
 
 ## Takeout Data Flow
 
@@ -60,7 +61,7 @@ The private surface is limited to `/login`, `/admin`, `/admin/imports` and impor
 ## Reliability
 
 - Alembic migrations run before every application start.
-- PostgreSQL and application health checks gate dependent containers.
+- PostgreSQL, application and Nginx health checks gate dependent containers.
 - Restarted in-flight imports are marked failed instead of remaining permanently processing.
 - Database and media have separate backup/restore procedures.
 - The deployment script only fast-forwards the selected Git branch.

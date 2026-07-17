@@ -31,8 +31,8 @@
 		format json
 	}
 
-	reverse_proxy app:8000 {
-		health_uri /healthz
+	reverse_proxy nginx:8080 {
+		health_uri /nginx-health
 		health_interval 5s
 		health_timeout 3s
 		health_passes 1

@@ -53,13 +53,39 @@ services:
     cap_drop:
       - ALL
 
+  nginx:
+    image: nginxinc/nginx-unprivileged:1.31.2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+      - /var/cache/nginx:size=64m,mode=0755
+      - /var/run:size=8m,mode=0755
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - frontend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
   caddy:
     image: caddy:2.10-alpine
     restart: unless-stopped
     env_file:
       - .env
     depends_on:
-      app:
+      nginx:
         condition: service_healthy
     ports:
       - "80:80"
