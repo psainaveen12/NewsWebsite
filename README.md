@@ -117,6 +117,26 @@ Add `ieltstask.com` to Cloudflare and use the Cloudflare nameservers at the doma
 
 Full steps: [docs/deployment-and-dns.md](docs/deployment-and-dns.md).
 
+## Streamlit Community Cloud
+
+The repository also contains a read-only Streamlit frontend for the production RSS feed. It does not replace the Docker-hosted FastAPI admin, PostgreSQL database or Blogger importer.
+
+Validate the deployment files and print the exact Community Cloud settings:
+
+```bash
+bash scripts/deploy-streamlit-cloud.sh
+```
+
+To preview it locally:
+
+```bash
+python3 -m venv .streamlit-venv
+.streamlit-venv/bin/pip install -r streamlit/requirements.txt
+.streamlit-venv/bin/streamlit run streamlit/streamlit_app.py
+```
+
+In Streamlit Community Cloud, select repository `psainaveen12/NewsWebsite`, branch `NewsWebsiteDocker`, and main file `streamlit/streamlit_app.py`. Optionally add `NEWS_SITE_URL = "https://news.ieltstask.com"` under app secrets.
+
 ## Google Takeout Import
 
 1. Open [Google Takeout](https://takeout.google.com/).
