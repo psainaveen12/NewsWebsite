@@ -1,0 +1,4 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="auth-page"><div class="auth-card"><a class="brand" href="/"><span>News</span><i></i></a><span class="admin-kicker">Private newsroom</span><h1>Welcome back</h1><p>Sign in to import a Google Takeout archive. No editorial controls are exposed here.</p>{% if error %}<div class="form-alert">{{ error }}</div>{% endif %}<form method="post" action="/login"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Username<input name="username" type="text" autocomplete="username" required autofocus></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="primary-button" type="submit">Sign in securely <span>→</span></button></form><a class="back-link" href="/">← Back to public site</a></div></section>
+{% endblock %}

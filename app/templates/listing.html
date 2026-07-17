@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_cards.html" import card %}
+{% block content %}
+<div class="shell page-shell listing-page">
+  <header class="listing-header"><span>{{ eyebrow }}</span><h1>{{ heading }}</h1>{% if query %}<p>Search across every imported article, headline and description.</p>{% endif %}</header>
+  {% if eyebrow == 'Search' %}<form class="big-search" action="/search"><input type="search" name="q" value="{{ query|default('') }}" placeholder="Search the newsroom" aria-label="Search the newsroom"><button>Search</button></form>{% endif %}
+  <div class="content-grid">
+    <section class="latest">
+      {% if articles %}<div class="story-list">{% for item in articles %}{{ card(item, 'list-card') }}{% endfor %}</div>{% else %}<div class="empty-state"><span>?</span><h2>No stories found</h2><p>Try another search term or explore a category from the navigation.</p></div>{% endif %}
+      <nav class="pagination" aria-label="Result pages">{% if page > 1 %}<a href="{{ path }}{% if '?' in path %}&{% else %}?{% endif %}page={{ page - 1 }}">← Previous</a>{% else %}<span></span>{% endif %}<span>Page {{ page }}</span>{% if has_next %}<a href="{{ path }}{% if '?' in path %}&{% else %}?{% endif %}page={{ page + 1 }}">Next →</a>{% endif %}</nav>
+    </section>
+    <aside class="sidebar">{% if popular %}<section class="popular-panel"><div class="panel-title"><h2>Popular posts</h2><span></span></div>{% for item in popular %}<article class="popular-item"><span>{{ '%02d'|format(loop.index) }}</span><div><h3><a href="/article/{{ item.slug }}">{{ item.title }}</a></h3><time>{{ item.published_at|date }}</time></div></article>{% endfor %}</section>{% endif %}</aside>
+  </div>
+</div>
+{% endblock %}

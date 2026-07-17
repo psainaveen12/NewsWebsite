@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, NewsWebsiteDocker]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install --requirement requirements-dev.txt
+      - run: pytest
+      - run: bash -n scripts/*.sh docker/entrypoint.sh
+      - run: cp .env.example .env
+      - run: docker compose config --quiet
+      - run: docker build --tag newswebsite:test .

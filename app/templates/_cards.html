@@ -1,0 +1,17 @@
+{% macro image(article, class_name='') %}
+  <div class="story-image {{ class_name }}{% if not article.featured_image %} image-fallback{% endif %}"{% if article.featured_image %} style="background-image:url('{{ article.featured_image }}')"{% endif %}>
+    {% if not article.featured_image %}<span>N</span>{% endif %}
+  </div>
+{% endmacro %}
+
+{% macro card(article, class_name='') %}
+<article class="story-card {{ class_name }}">
+  <a class="story-media" href="/article/{{ article.slug }}" aria-label="{{ article.title }}">{{ image(article) }}</a>
+  <div class="story-copy">
+    {% if article.labels %}<a class="story-label" href="/label/{{ article.labels[0]|pathquote }}">{{ article.labels[0] }}</a>{% endif %}
+    <h2><a href="/article/{{ article.slug }}">{{ article.title }}</a></h2>
+    {% if article.summary %}<p>{{ article.summary }}</p>{% endif %}
+    <div class="story-meta"><span>by <strong>{{ article.author_name }}</strong></span><time datetime="{{ article.published_at.isoformat() }}">{{ article.published_at|date }}</time></div>
+  </div>
+</article>
+{% endmacro %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_cards.html" import card %}
+{% block head %}
+<script nonce="{{ csp_nonce }}" type="application/ld+json">{{ {'@context':'https://schema.org','@type':'NewsArticle','headline':article.title,'description':article.summary,'datePublished':article.published_at.isoformat(),'dateModified':article.updated_at.isoformat(),'author':{'@type':'Person','name':article.author_name},'mainEntityOfPage':canonical,'image':article.featured_image}|tojson }}</script>
+{% endblock %}
+{% block content %}
+<article class="article-page">
+  <header class="article-header shell article-shell">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>›</span>{% if article.labels %}<a href="/label/{{ article.labels[0]|pathquote }}">{{ article.labels[0] }}</a><span>›</span>{% endif %}<span>Article</span></nav>
+    {% if article.labels %}<a class="story-label" href="/label/{{ article.labels[0]|pathquote }}">{{ article.labels[0] }}</a>{% endif %}
+    <h1>{{ article.title }}</h1>
+    {% if article.summary %}<p class="article-deck">{{ article.summary }}</p>{% endif %}
+    <div class="article-byline"><div class="author-mark">{{ article.author_name[:1]|upper }}</div><div><span>By <strong>{{ article.author_name }}</strong></span><time datetime="{{ article.published_at.isoformat() }}">Published {{ article.published_at|date('%B %d, %Y · %H:%M') }}</time></div><button type="button" class="share-button" data-share data-title="{{ article.title }}">Share <span>↗</span></button></div>
+  </header>
+  {% if article.featured_image %}<figure class="article-hero shell"><img src="{{ article.featured_image }}" alt="" fetchpriority="high"><figcaption>{{ article.title }}</figcaption></figure>{% endif %}
+  <div class="article-layout shell">
+    <aside class="share-rail" aria-label="Share article"><span>Share</span><a href="https://www.facebook.com/sharer.php?u={{ canonical|urlencode }}" target="_blank" rel="noopener">f</a><a href="https://twitter.com/intent/tweet?url={{ canonical|urlencode }}&text={{ article.title|urlencode }}" target="_blank" rel="noopener">𝕏</a><a href="mailto:?subject={{ article.title|urlencode }}&body={{ canonical|urlencode }}">@</a></aside>
+    <div class="article-body">{{ article.content_html|safe }}</div>
+  </div>
+  {% if article.labels %}<div class="shell article-shell tag-row"><span>Filed under</span>{% for label in article.labels %}<a href="/label/{{ label|pathquote }}">{{ label }}</a>{% endfor %}</div>{% endif %}
+</article>
+
+{% if comments %}<section class="comments shell article-shell" id="comments"><div class="section-heading compact"><div><span>Discussion</span><h2>{{ comments|length }} comment{% if comments|length != 1 %}s{% endif %}</h2></div></div>{% for comment in comments %}<article class="comment"><div class="comment-avatar">{{ comment.author_name[:1]|upper }}</div><div><header><strong>{{ comment.author_name }}</strong><time>{{ comment.published_at|date('%B %d, %Y · %H:%M') }}</time></header><div class="comment-content">{{ comment.content_html|safe }}</div></div></article>{% endfor %}</section>{% endif %}
+
+{% if related %}<section class="related shell"><div class="section-heading"><div><span>Keep reading</span><h2>You may also like</h2></div></div><div class="related-grid">{% for item in related %}{{ card(item, 'related-card') }}{% endfor %}</div></section>{% endif %}
+{% endblock %}

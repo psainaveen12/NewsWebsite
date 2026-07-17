@@ -1,0 +1,1 @@
+"""IELTSTask Docker news application."""

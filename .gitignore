@@ -2,7 +2,11 @@
 .env
 .env.local
 .venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
 backups/
+data/
 *.log
 *.sql
 *.sql.gz

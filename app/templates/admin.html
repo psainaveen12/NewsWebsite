@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="admin-page shell">
+  <header class="admin-header"><div><span class="admin-kicker">Private newsroom</span><h1>Blogger Takeout importer</h1><p>Upload the complete Google Takeout ZIP. Posts, pages, labels, comments and embedded images are mapped automatically.</p></div><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="ghost-button">Sign out</button></form></header>
+  {% if request.query_params.get('upload_error') %}<div class="form-alert">{{ request.query_params.get('upload_error') }}</div>{% endif %}
+  <section class="admin-stats"><div><span>Articles</span><strong>{{ counts.articles }}</strong></div><div><span>Pages</span><strong>{{ counts.pages }}</strong></div><div><span>Comments</span><strong>{{ counts.comments }}</strong></div></section>
+  <section class="upload-panel">
+    <div class="upload-intro"><span>01</span><div><h2>Import Google Takeout</h2><p>Choose the original ZIP downloaded from Google Takeout. Do not unzip or modify it first.</p></div></div>
+    <form method="post" action="/admin/imports" enctype="multipart/form-data" data-upload-form>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="drop-zone"><input name="archive" type="file" accept=".zip,application/zip" required data-file-input><span class="upload-icon">↑</span><strong data-file-label>Drop your Blogger Takeout ZIP here</strong><small>or click to browse · maximum {{ settings.max_upload_mb }} MB</small></label>
+      <button class="primary-button" type="submit" data-upload-button disabled>Validate and import <span>→</span></button>
+    </form>
+    <div class="privacy-note"><strong>Private by design</strong><span>The archive is processed inside your Docker stack and deleted after import. Only extracted public article media remains.</span></div>
+  </section>
+  <section class="imports-panel"><div class="section-heading compact"><div><span>Audit trail</span><h2>Recent imports</h2></div></div>{% if jobs %}<div class="import-list">{% for job in jobs %}<article id="import-{{ job.id }}" class="import-row" data-import-id="{{ job.id }}" data-status="{{ job.status }}"><div class="file-badge">ZIP</div><div class="import-main"><header><strong>{{ job.filename }}</strong><span class="status status-{{ job.status }}" data-status-label>{{ job.status }}</span></header><div class="progress-track"><span style="width:{{ job.progress }}%" data-progress-bar></span></div><footer><span data-stage>{{ job.stage }}</span><span data-progress-text>{{ job.progress }}%</span></footer>{% if job.error %}<p class="import-error">{{ job.error }}</p>{% endif %}{% if job.status == 'completed' %}<p class="import-result">{{ job.posts_created }} posts created · {{ job.posts_updated }} updated · {{ job.pages_created }} pages · {{ job.comments_created }} comments · {{ job.assets_created }} assets</p>{% endif %}</div></article>{% endfor %}</div>{% else %}<div class="empty-imports">No imports yet.</div>{% endif %}</section>
+</div>
+{% endblock %}

@@ -1,0 +1,2 @@
+{% extends "base.html" %}
+{% block content %}<article class="static-page shell article-shell"><span class="page-kicker">{{ site_name }}</span><h1>{{ article.title }}</h1><div class="article-body">{{ article.content_html|safe }}</div></article>{% endblock %}

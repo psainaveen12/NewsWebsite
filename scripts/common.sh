@@ -33,5 +33,6 @@ timestamp() {
 }
 
 backup_root() {
-  printf '%s\n' "${BACKUP_ROOT:-$PROJECT_ROOT/backups}"
+  local root="${BACKUP_ROOT:-$PROJECT_ROOT/backups}"
+  if [[ "$root" = /* ]]; then printf '%s\n' "$root"; else printf '%s\n' "$PROJECT_ROOT/${root#./}"; fi
 }
