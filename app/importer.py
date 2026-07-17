@@ -10,7 +10,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlparse, urlunsplit
 
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.database import SessionLocal
+from app.integrations import submit_indexnow
 from app.models import Article, Asset, Comment, ImportJob, utcnow
 
 
@@ -483,6 +484,46 @@ def _upsert_articles(
     return by_source, by_url
 
 
+def _rewrite_internal_links(session: Session, imported: list[Article]) -> None:
+    settings = get_settings()
+    targets: dict[str, str] = {}
+    for article in session.scalars(select(Article).where(Article.original_url.is_not(None))):
+        source_path = urlparse(article.original_url or "").path
+        if source_path:
+            route = "p" if article.kind == "page" else "article"
+            targets[source_path.rstrip("/") or "/"] = f"/{route}/{article.slug}"
+
+    internal_hosts = {"ieltstask.com", "www.ieltstask.com", settings.app_domain.lower()}
+    for article in imported:
+        soup = BeautifulSoup(article.content_html, "html.parser")
+        changed = False
+        for anchor in soup.find_all("a", href=True):
+            parsed = urlparse(anchor["href"])
+            if parsed.hostname and parsed.hostname.lower() not in internal_hosts:
+                continue
+            target = targets.get((parsed.path.rstrip("/") or "/"))
+            if target:
+                anchor["href"] = urlunsplit(("", "", target, parsed.query, parsed.fragment))
+                changed = True
+        if changed:
+            article.content_html = str(soup)
+    session.commit()
+
+
+def _link_assets_to_articles(session: Session, imported: list[Article]) -> None:
+    unlinked = {
+        asset.public_path: asset
+        for asset in session.scalars(select(Asset).where(Asset.article_id.is_(None)))
+    }
+    for article in imported:
+        soup = BeautifulSoup(article.content_html, "html.parser")
+        for node in soup.find_all(["img", "a"]):
+            path = node.get("src") or node.get("href")
+            if path in unlinked:
+                unlinked[path].article_id = article.id
+    session.commit()
+
+
 def _upsert_comments(
     session: Session,
     job: ImportJob,
@@ -500,22 +541,24 @@ def _upsert_comments(
                 job.warnings = [*job.warnings, f"Comment {entry.source_id} has no matching post"]
             continue
         comment_targets[entry.source_id] = article
-        if session.scalar(select(Comment).where(Comment.source_id == entry.source_id)):
-            continue
+        existing = session.scalar(select(Comment).where(Comment.source_id == entry.source_id))
         cleaned, _ = sanitize_content(entry.content, by_path, by_basename)
-        session.add(
-            Comment(
+        if existing:
+            comment = existing
+        else:
+            comment = Comment(
                 article_id=article.id,
                 source_id=entry.source_id,
-                author_name=entry.author[:255],
-                author_url=entry.author_url,
-                avatar_url=entry.avatar_url,
-                content_html=cleaned,
-                published_at=entry.published_at,
-                is_published=entry.is_published,
             )
-        )
-        job.comments_created += 1
+            session.add(comment)
+            job.comments_created += 1
+        comment.article_id = article.id
+        comment.author_name = entry.author[:255]
+        comment.author_url = entry.author_url
+        comment.avatar_url = entry.avatar_url
+        comment.content_html = cleaned
+        comment.published_at = entry.published_at
+        comment.is_published = entry.is_published
     session.commit()
 
 
@@ -547,6 +590,9 @@ def import_takeout(job_id: uuid.UUID, archive_path: Path) -> None:
                 session.commit()
                 _progress(session, job, 58, "Importing posts and pages")
                 by_source, by_url = _upsert_articles(session, job, entries, by_path, by_basename)
+                imported_articles = list(by_source.values())
+                _rewrite_internal_links(session, imported_articles)
+                _link_assets_to_articles(session, imported_articles)
                 _progress(session, job, 82, "Linking comments")
                 _upsert_comments(session, job, entries, by_source, by_url, by_path, by_basename)
             job.status = "completed"
@@ -554,6 +600,13 @@ def import_takeout(job_id: uuid.UUID, archive_path: Path) -> None:
             job.stage = "Import complete"
             job.completed_at = utcnow()
             session.commit()
+            submit_indexnow(
+                [
+                    f"{get_settings().app_base_url}/{'p' if article.kind == 'page' else 'article'}/{article.slug}"
+                    for article in by_source.values()
+                    if article.is_published
+                ]
+            )
         except Exception as exc:
             session.rollback()
             job = session.get(ImportJob, job_id)

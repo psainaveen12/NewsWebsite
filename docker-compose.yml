@@ -20,6 +20,11 @@ services:
       - backend
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
 
   app:
     build:
@@ -34,8 +39,6 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       DATA_DIR: /data
-    ports:
-      - "127.0.0.1:${LOCAL_HTTP_PORT:-80}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=5)"]
       interval: 10s
@@ -54,37 +57,57 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
 
-  cloudflared:
-    image: cloudflare/cloudflared:2026.7.2
-    profiles:
-      - cloudflare
+  caddy:
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
     depends_on:
       app:
         condition: service_healthy
     environment:
-      TUNNEL_TOKEN_FILE: /run/secrets/cloudflare_tunnel_token
+      APP_SITE_ADDRESS: ${APP_SITE_ADDRESS:-http://localhost}
+      TLS_EMAIL: ${TLS_EMAIL:-puttisainaveen@gmail.com}
+      CADDY_MAX_REQUEST_BODY: ${CADDY_MAX_REQUEST_BODY:-2GB}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     read_only: true
     tmpfs:
       - /tmp:size=64m,mode=1777
-    secrets:
-      - cloudflare_tunnel_token
     networks:
       - frontend
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
 
 volumes:
+  caddy_config:
+  caddy_data:
   media_data:
   postgres_data:
-
-secrets:
-  cloudflare_tunnel_token:
-    file: ${CLOUDFLARE_TUNNEL_TOKEN_FILE:-./secrets/cloudflare-tunnel-token}
 
 networks:
   backend:

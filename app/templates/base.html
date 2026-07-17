@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#fd3a13">
   <meta name="description" content="{{ description|default('Independent news, technology, business, politics and world coverage.', true) }}">
   {% if settings.google_site_verification %}<meta name="google-site-verification" content="{{ settings.google_site_verification }}">{% endif %}
+  {% if settings.bing_site_verification %}<meta name="msvalidate.01" content="{{ settings.bing_site_verification }}">{% endif %}
   <title>{{ title }}{% if title != site_name %} | {{ site_name }}{% endif %}</title>
   {% if canonical %}<link rel="canonical" href="{{ canonical }}">{% endif %}
   <link rel="alternate" type="application/rss+xml" title="{{ site_name }} RSS" href="/feed.xml">
@@ -19,12 +20,18 @@
   <meta property="og:type" content="{% if article is defined and article.kind == 'post' %}article{% else %}website{% endif %}">
   {% if canonical %}<meta property="og:url" content="{{ canonical }}">{% endif %}
   {% if article is defined and article.featured_image %}<meta property="og:image" content="{{ article.featured_image if article.featured_image.startswith('http') else base_url + article.featured_image }}">{% endif %}
+  <meta name="twitter:card" content="{% if article is defined and article.featured_image %}summary_large_image{% else %}summary{% endif %}">
+  <meta name="twitter:title" content="{{ title }}">
+  <meta name="twitter:description" content="{{ description|default('Independent news and analysis.', true) }}">
+  {% if article is defined and article.featured_image %}<meta name="twitter:image" content="{{ article.featured_image if article.featured_image.startswith('http') else base_url + article.featured_image }}">{% endif %}
   {% if settings.adsense_publisher_id %}<meta name="google-adsense-account" content="{{ settings.adsense_publisher_id }}">{% endif %}
+  <script nonce="{{ csp_nonce }}" type="application/ld+json">{{ {'@context':'https://schema.org','@type':'Organization','name':site_name,'url':base_url,'logo':base_url ~ url_for('static', path='/news-logo.png')}|tojson }}</script>
   {% block head %}{% endblock %}
   {% if settings.ga_measurement_id %}
   <script nonce="{{ csp_nonce }}" async src="https://www.googletagmanager.com/gtag/js?id={{ settings.ga_measurement_id }}"></script>
   <script nonce="{{ csp_nonce }}">window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','{{ settings.ga_measurement_id }}');</script>
   {% endif %}
+  {% if settings.adsense_publisher_id %}<script nonce="{{ csp_nonce }}" async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ settings.adsense_publisher_id }}"></script>{% endif %}
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>

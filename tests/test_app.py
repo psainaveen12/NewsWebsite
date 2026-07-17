@@ -11,6 +11,8 @@ os.environ["DATA_DIR"] = "/tmp/newswebsite-docker-test-data"
 os.environ["SESSION_SECRET"] = "test-session-secret-with-more-than-32-characters"
 os.environ["ADMIN_USERNAME"] = "sainaveennews"
 os.environ["ADMIN_PASSWORD"] = "test-admin-password-12345"
+os.environ["BING_SITE_VERIFICATION"] = "test-bing-verification"
+os.environ["ADSENSE_PUBLISHER_ID"] = "ca-pub-1234567890123456"
 
 Path("/tmp/newswebsite-docker-test.db").unlink(missing_ok=True)
 shutil.rmtree("/tmp/newswebsite-docker-test-data", ignore_errors=True)
@@ -19,6 +21,7 @@ from bs4 import BeautifulSoup  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import func, select  # noqa: E402
 
+from app.audit import build_migration_report  # noqa: E402
 from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Article, Asset, Comment, ImportJob  # noqa: E402
@@ -39,7 +42,7 @@ def takeout_zip(title: str = "A Test Story") -> bytes:
         <category scheme="http://schemas.google.com/g/2005#kind" term="http://schemas.google.com/blogger/2008/kind#post"/>
         <category scheme="http://www.blogger.com/atom/ns#" term="World News"/>
         <title>{title}</title>
-        <content type="html">&lt;p&gt;Imported body with useful reporting.&lt;/p&gt;&lt;img src="Blogger/Media/news.jpg" alt="News image"&gt;&lt;script&gt;bad()&lt;/script&gt;</content>
+        <content type="html">&lt;p&gt;Imported body with useful reporting.&lt;/p&gt;&lt;a href="https://www.ieltstask.com/p/about-us.html"&gt;About&lt;/a&gt;&lt;img src="Blogger/Media/news.jpg" alt="News image"&gt;&lt;script&gt;bad()&lt;/script&gt;</content>
         <author><name>sai</name><uri>https://example.com/author</uri></author>
         <link rel="alternate" href="https://www.ieltstask.com/2026/07/a-test-story.html"/>
       </entry>
@@ -134,6 +137,11 @@ def test_public_routes_do_not_require_login():
         assert client.get("/search").status_code == 200
         assert client.get("/feed.xml").status_code == 200
         assert client.get("/sitemap.xml").status_code == 200
+        assert client.get("/api/v1/articles").status_code == 200
+        assert "pub-1234567890123456" in client.get("/ads.txt").text
+        homepage = client.get("/")
+        assert 'name="msvalidate.01" content="test-bing-verification"' in homepage.text
+        assert "pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" in homepage.text
         response = client.get("/admin", follow_redirects=False)
         assert response.status_code == 303
         assert response.headers["location"] == "/login"
@@ -182,10 +190,24 @@ def test_takeout_upload_imports_full_content_and_is_idempotent():
         article_page = client.get("/article/a-test-story")
         assert article_page.status_code == 200
         assert "Imported body with useful reporting" in article_page.text
+        assert 'href="/p/about-us"' in article_page.text
         assert "Insightful comment" in article_page.text
         assert client.get("/p/about-us").status_code == 200
+        old_post = client.get("/2026/07/a-test-story.html", follow_redirects=False)
+        assert old_post.status_code == 301
+        assert old_post.headers["location"] == "/article/a-test-story"
+        old_page = client.get("/p/about-us.html", follow_redirects=False)
+        assert old_page.status_code == 301
+        assert old_page.headers["location"] == "/p/about-us"
         assert client.get("/label/World%20News").status_code == 200
         assert "A Test Story" in client.get("/search?q=useful").text
+        api_article = client.get("/api/v1/articles/a-test-story")
+        assert api_article.status_code == 200
+        assert api_article.json()["title"] == "A Test Story"
+        assert "Imported body" in api_article.json()["content_html"]
+        audit = build_migration_report()
+        assert audit["broken_local_media"] == []
+        assert audit["remaining_www_internal_links"] == 0
 
         admin = client.get("/admin")
         client.post(

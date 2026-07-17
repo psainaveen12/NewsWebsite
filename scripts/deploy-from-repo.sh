@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-${1:-}}"
-BRANCH="${DEPLOY_BRANCH:-${2:-NewsWebsiteDocker}}"
+BRANCH="${DEPLOY_BRANCH:-${2:-NewsWebsiteGCP}}"
 TARGET_DIR="${DEPLOY_DIR:-${3:-$PWD/newswebsite}}"
 
 if [ -z "$REPO_URL" ]; then

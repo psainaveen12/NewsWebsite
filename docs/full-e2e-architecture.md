@@ -1,67 +1,67 @@
-# Full End-To-End Architecture
+# Full End-To-End GCP Architecture
 
 ## Runtime Boundary
 
-The application and database are provider-neutral. Cloudflare Tunnel supplies public ingress without exposing the Docker host or requiring a stable public IPv4 address.
+One GCP Compute Engine VM owns the runtime, data and operations. Its reserved static IPv4 is the target of the Squarespace `news` A record.
 
 ```mermaid
 flowchart TB
   subgraph Internet
     U[Public readers]
-    N[Private administrator]
-    C[Cloudflare edge and DNS]
+    A[Private administrator]
+    D[Squarespace DNS]
+    S[Search and analytics crawlers]
   end
-  U -->|HTTPS| C
-  N -->|HTTPS login and ZIP upload| C
-  C -->|Encrypted outbound tunnel| T[cloudflared container]
-  T -->|Docker frontend network| API[FastAPI container]
-  API -->|SQL| DB[(PostgreSQL volume)]
-  API -->|Images| MEDIA[(Media volume)]
-  API -->|Temporary ZIP| MEDIA
+  D --> IP[GCP static IPv4]
+  U -->|HTTPS| IP
+  A -->|HTTPS login and ZIP upload| IP
+  S -->|HTTPS| IP
+  subgraph VM[Single Compute Engine Ubuntu VM]
+    C[Caddy: TLS, HTTP/3, compression, headers, logs]
+    API[FastAPI: public CMS and Takeout-only admin]
+    DB[(PostgreSQL Docker volume)]
+    MEDIA[(Imported media Docker volume)]
+    TLS[(Caddy certificate volumes)]
+    BACKUP[(Local database and media backups)]
+    CRON[Cron monitoring and backup verification]
+    C --> API
+    API --> DB
+    API --> MEDIA
+    C --> TLS
+    CRON --> BACKUP
+    BACKUP --- DB
+    BACKUP --- MEDIA
+  end
+  IP --> C
 ```
 
-No container publishes a public host port. The application has a loopback-only local binding and is reachable by `cloudflared` on the Docker `frontend` network. PostgreSQL is attached exclusively to the internal `backend` network.
+Only Caddy publishes host ports. PostgreSQL is on an internal Docker network and FastAPI is reachable only from Caddy and PostgreSQL’s private networks. No AWS, Cloudflare, external database, GKE, Cloud Run, load balancer or object storage service is required.
 
 ## Takeout Data Flow
 
-1. The administrator authenticates using credentials supplied through `.env`.
-2. CSRF validation and upload-size controls run before processing.
-3. The ZIP streams to the persistent import directory without loading the complete file into memory.
-4. The archive index is checked for path traversal, symbolic links, file-count limits, inflated-size limits and suspicious compression ratios.
-5. Image assets are hashed, deduplicated and saved under the persistent media volume.
-6. Blogger Atom entries are classified as posts, pages or comments. HTML files provide a fallback for newer Takeout layouts without Atom content.
-7. Post HTML is sanitized. Local image references are rewritten to `/media/...`; unsafe scripts, forms and embeds are removed.
-8. Posts and pages are upserted by stable Blogger source ID. Re-importing updates matching content.
-9. Comments are linked through Blogger `in-reply-to` references and upserted by source ID.
-10. Import counts, warnings, errors and progress remain in PostgreSQL for auditability.
-11. The original ZIP is deleted in a `finally` path after success or failure.
+1. The single administrator authenticates with server-side environment credentials.
+2. Signed cookies, throttling and CSRF validation protect login, upload and logout.
+3. The ZIP streams to persistent storage with byte, file-count, expanded-size, path and compression-ratio limits.
+4. Assets are hashed, deduplicated and stored under the media volume.
+5. Classic and modern Blogger Atom entries are classified as posts, pages or comments; valid HTML exports provide fallback content.
+6. Unsafe HTML and embeds are removed; images are lazy-loaded and local Takeout references are rewritten.
+7. Posts/pages are upserted by Blogger source ID, comments are linked and updated, and assets are associated with articles.
+8. Historic internal links are rewritten and original Blogger paths remain available as permanent redirects.
+9. The import audit records counts, progress, warnings and errors; the uploaded ZIP is deleted in all outcomes.
+10. A successful import optionally submits published URLs to IndexNow.
 
-## Public Experience
+## Public And Private Surfaces
 
-All public routes require no session:
+Public: `/`, `/article/{slug}`, `/p/{slug}`, `/label/{label}`, `/search`, Blogger legacy paths, `/api/v1/articles`, `/feed.xml`, `/sitemap.xml`, `/robots.txt`, `/ads.txt`, IndexNow key and `/media`.
 
-- `/` latest and featured stories
-- `/article/{slug}` articles and imported comments
-- `/p/{slug}` imported Blogger pages
-- `/label/{label}` categories
-- `/search?q=` full-text-like search over imported content
-- `/feed.xml`, `/sitemap.xml`, `/robots.txt`
-- `/media/...` imported assets
-
-The private surface is limited to `/login`, `/admin`, `/admin/imports` and import status polling. There are no public registration, editing, deletion, database or user-management controls.
-
-## Data Model
-
-- `articles`: Blogger posts and pages, source IDs, sanitized content, labels, dates and display metadata
-- `comments`: imported Blogger comments linked to their article
-- `assets`: checksum-deduplicated media and public paths
-- `import_jobs`: upload audit, state, progress, counts, warnings and failures
+Private: `/login`, `/admin`, `/admin/imports` and import status polling. There is no registration, editing, deletion, plugin, theme, database, user-management or write API surface.
 
 ## Reliability
 
-- Alembic migrations run before every application start.
-- PostgreSQL and application health checks gate the tunnel container.
-- Cloudflare Tunnel reconnects automatically and the container restarts unless stopped.
-- Restarted in-flight imports are marked failed instead of remaining permanently processing.
-- Database and media have separate backup/restore procedures.
-- The deployment script only fast-forwards the selected Git branch.
+- Alembic migrations execute before app startup.
+- PostgreSQL health gates FastAPI; FastAPI health gates Caddy.
+- Containers restart unless stopped and logs rotate locally.
+- Daily database/media backups and weekly isolated restore tests are scheduled.
+- Monitoring checks containers, HTTPS/database health and disk usage every five minutes.
+- Deployments back up data before a fast-forward build.
+- Rollback changes application code only; Docker data volumes remain intact.

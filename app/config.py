@@ -22,8 +22,12 @@ class Settings(BaseSettings):
     max_archive_files: int = Field(default=20000, ge=1, le=100000)
     max_archive_uncompressed_mb: int = Field(default=8192, ge=1, le=51200)
     google_site_verification: str = ""
+    bing_site_verification: str = ""
     ga_measurement_id: str = ""
     adsense_publisher_id: str = ""
+    ads_txt_line: str = ""
+    indexnow_key: str = ""
+    contact_email: str = "puttisainaveen@gmail.com"
 
     @field_validator("app_base_url")
     @classmethod

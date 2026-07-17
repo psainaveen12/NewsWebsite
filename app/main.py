@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, quote_plus
+from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
@@ -83,7 +84,8 @@ async def security_headers(request: Request, call_next):
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: https: http:; media-src 'self' https:; "
         "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://googleads.g.doubleclick.net; "
-        "connect-src 'self' https://www.google-analytics.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
+        "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
     )
     if request.url.path.startswith(("/admin", "/login")):
         response.headers["Cache-Control"] = "no-store"
@@ -106,6 +108,48 @@ def context(request: Request, session: Session, **values):
 
 def page_number(value: int) -> int:
     return max(1, min(value, 100000))
+
+
+def article_json(article: Article, include_content: bool = False) -> dict:
+    route = "p" if article.kind == "page" else "article"
+    payload = {
+        "id": article.id,
+        "kind": article.kind,
+        "slug": article.slug,
+        "title": article.title,
+        "summary": article.summary,
+        "author": article.author_name,
+        "featured_image": article.featured_image,
+        "labels": article.labels,
+        "published_at": article.published_at.isoformat(),
+        "updated_at": article.updated_at.isoformat(),
+        "url": f"{settings.app_base_url}/{route}/{article.slug}",
+    }
+    if include_content:
+        payload["content_html"] = article.content_html
+    return payload
+
+
+def legacy_target(session: Session, path: str) -> Article | None:
+    candidates = {
+        path,
+        f"http://ieltstask.com{path}",
+        f"https://ieltstask.com{path}",
+        f"http://www.ieltstask.com{path}",
+        f"https://www.ieltstask.com{path}",
+        f"{settings.app_base_url}{path}",
+    }
+    return session.scalar(
+        select(Article).where(
+            Article.is_published.is_(True),
+            Article.original_url.in_(candidates),
+        )
+    )
+
+
+def legacy_redirect(article: Article) -> RedirectResponse:
+    route = "p" if article.kind == "page" else "article"
+    return RedirectResponse(f"/{route}/{article.slug}", status_code=301)
 
 
 @app.get("/healthz")
@@ -185,6 +229,10 @@ def article_page(slug: str, request: Request, session: Session = Depends(get_db)
 
 @app.get("/p/{slug}", response_class=HTMLResponse)
 def content_page(slug: str, request: Request, session: Session = Depends(get_db)):
+    if slug.endswith(".html"):
+        legacy = legacy_target(session, f"/p/{slug}")
+        if legacy:
+            return legacy_redirect(legacy)
     article = session.scalar(
         select(Article).where(Article.slug == slug, Article.kind == "page", Article.is_published.is_(True))
     )
@@ -202,6 +250,43 @@ def content_page(slug: str, request: Request, session: Session = Depends(get_db)
             canonical=f"{settings.app_base_url}/p/{article.slug}",
         ),
     )
+
+
+@app.get("/{year:int}/{month:int}/{slug}.html")
+def blogger_post_redirect(year: int, month: int, slug: str, session: Session = Depends(get_db)):
+    legacy = legacy_target(session, f"/{year:04d}/{month:02d}/{slug}.html")
+    if not legacy:
+        raise HTTPException(status_code=404)
+    return legacy_redirect(legacy)
+
+
+@app.get("/api/v1/articles")
+def api_articles(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=100000),
+    q: str = Query("", max_length=120),
+    label: str = Query("", max_length=120),
+    session: Session = Depends(get_db),
+):
+    normalized_query = " ".join(q.split())
+    normalized_label = " ".join(label.split())
+    if normalized_query:
+        articles = search_posts(session, normalized_query, limit, offset)
+    elif normalized_label:
+        articles = category_posts(session, normalized_label, limit, offset)
+    else:
+        articles = latest_posts(session, limit, offset)
+    return {"items": [article_json(article) for article in articles], "count": len(articles), "limit": limit, "offset": offset}
+
+
+@app.get("/api/v1/articles/{slug}")
+def api_article(slug: str, session: Session = Depends(get_db)):
+    article = session.scalar(
+        select(Article).where(Article.slug == slug, Article.kind == "post", Article.is_published.is_(True))
+    )
+    if not article:
+        raise HTTPException(status_code=404)
+    return article_json(article, include_content=True)
 
 
 @app.get("/label/{label}", response_class=HTMLResponse)
@@ -373,14 +458,24 @@ def robots():
     return f"User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /login\nSitemap: {settings.app_base_url}/sitemap.xml\n"
 
 
+@app.get("/ads.txt", response_class=PlainTextResponse)
+def ads_txt():
+    line = settings.ads_txt_line.strip()
+    if not line and settings.adsense_publisher_id:
+        line = f"google.com, {settings.adsense_publisher_id.removeprefix('ca-')}, DIRECT, f08c47fec0942fa0"
+    if not line:
+        raise HTTPException(status_code=404)
+    return f"{line}\n"
+
+
 @app.get("/sitemap.xml")
 def sitemap(session: Session = Depends(get_db)):
     articles = list(session.scalars(select(Article).where(Article.is_published.is_(True)).order_by(Article.updated_at.desc())))
-    urls = [f"<url><loc>{settings.app_base_url}/</loc></url>"]
+    urls = [f"<url><loc>{xml_escape(settings.app_base_url)}/</loc></url>"]
     for article in articles:
         route = "p" if article.kind == "page" else "article"
         urls.append(
-            f"<url><loc>{settings.app_base_url}/{route}/{article.slug}</loc><lastmod>{article.updated_at.date().isoformat()}</lastmod></url>"
+            f"<url><loc>{xml_escape(settings.app_base_url)}/{route}/{xml_escape(article.slug)}</loc><lastmod>{article.updated_at.date().isoformat()}</lastmod></url>"
         )
     return Response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + "".join(urls) + "</urlset>", media_type="application/xml")
 
@@ -388,14 +483,24 @@ def sitemap(session: Session = Depends(get_db)):
 @app.get("/feed.xml")
 def feed(session: Session = Depends(get_db)):
     articles = latest_posts(session, 20)
+    def cdata(value: str) -> str:
+        return value.replace("]]>", "]]]]><![CDATA[>")
+
     items = "".join(
-        f"<item><title><![CDATA[{article.title}]]></title><link>{settings.app_base_url}/article/{article.slug}</link>"
-        f"<guid>{settings.app_base_url}/article/{article.slug}</guid><pubDate>{article.published_at:%a, %d %b %Y %H:%M:%S %z}</pubDate>"
-        f"<description><![CDATA[{article.summary}]]></description></item>"
+        f"<item><title><![CDATA[{cdata(article.title)}]]></title><link>{xml_escape(settings.app_base_url)}/article/{xml_escape(article.slug)}</link>"
+        f"<guid>{xml_escape(settings.app_base_url)}/article/{xml_escape(article.slug)}</guid><pubDate>{article.published_at:%a, %d %b %Y %H:%M:%S %z}</pubDate>"
+        f"<description><![CDATA[{cdata(article.summary)}]]></description></item>"
         for article in articles
     )
-    xml = f"<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\"><channel><title>{settings.site_name}</title><link>{settings.app_base_url}</link><description>Independent news and analysis</description>{items}</channel></rss>"
+    xml = f"<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\"><channel><title>{xml_escape(settings.site_name)}</title><link>{xml_escape(settings.app_base_url)}</link><description>Independent news and analysis</description>{items}</channel></rss>"
     return Response(xml, media_type="application/rss+xml")
+
+
+@app.get("/{key}.txt", response_class=PlainTextResponse)
+def indexnow_key_file(key: str):
+    if not settings.indexnow_key or key != settings.indexnow_key:
+        raise HTTPException(status_code=404)
+    return f"{settings.indexnow_key}\n"
 
 
 @app.exception_handler(404)

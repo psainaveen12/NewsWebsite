@@ -13,3 +13,6 @@ secrets/
 *.sql.gz
 *.tar
 *.tar.gz
+*.key
+*.pem
+gcp-credentials*.json

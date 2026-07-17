@@ -1,43 +1,40 @@
 # Security Model
 
-## Authentication
+## Identity And Admin Scope
 
 - One environment-configured administrator account
-- Constant-time username and password comparison
-- Signed, HTTP-only, SameSite session cookie
-- Secure cookies required in production
-- Eight-hour session lifetime
-- Login throttling by client address
-- CSRF tokens on login, import and logout
-- No registration, user management, editing or deletion API
+- Constant-time credential comparison
+- Signed HTTP-only, SameSite session cookie; Secure in production
+- Eight-hour sessions, IP throttling and CSRF validation
+- Admin can only upload Takeout and inspect import status
+- No registration, publishing, editing, deletion, database or user-management APIs
 
-The requested initial password must be stored only in the production `.env`. Rotate it if it has been shared through chat, email or logs.
+Store the requested initial password only in the VM `.env` and rotate it after first use because it has already been shared. Never commit credentials.
 
-## Archive Processing
+## Host And Network
 
-- ZIP extension and structure validation
-- Streamed upload with configured byte limit
-- Path traversal and absolute path rejection
-- Symbolic-link rejection
-- Maximum file count and expanded archive size
-- Suspicious compression-ratio rejection
-- Image checksum deduplication
-- HTML sanitization before database storage
-- Non-YouTube iframes, scripts, forms, objects and embeds removed
-- Original upload removed after processing
+- GCP firewall and UFW expose only restricted SSH plus HTTP/HTTPS
+- SSH public keys only after bootstrap verifies `authorized_keys`
+- Root SSH and password authentication disabled
+- fail2ban and unattended security updates enabled
+- PostgreSQL has no host port and uses an internal Docker network
+- FastAPI has no host port; only Caddy can reach it
+- Caddy manages TLS, redirects HTTP, compresses responses and applies security headers
+- App and Caddy use read-only filesystems, temporary filesystems, dropped capabilities and `no-new-privileges`
+- Docker JSON logs rotate to prevent unbounded disk growth
 
-## Runtime Isolation
+## Application And Imports
 
-- PostgreSQL has no published host port
-- Internal Docker network separates the database
-- Application container runs as UID/GID `10001`
-- Read-only application filesystem with dedicated temporary and media mounts
-- Linux capabilities dropped from the application
-- Cloudflare Tunnel uses outbound-only connectivity; no public origin port is published
-- The local application port is bound only to host loopback
-- Security headers and content security policy are applied to every response
-- Admin pages receive `no-store` and `noindex`
+- CSP, HSTS, frame, MIME, referrer and permissions headers
+- Admin responses are `no-store` and `noindex`
+- Streamed upload limits, ZIP validation, traversal/symlink rejection and zip-bomb controls
+- HTML sanitization and restricted iframe hosts
+- Checksum media deduplication and original ZIP deletion
+- XML parsing uses `defusedxml`
+- JSON API is read-only and exposes published posts only
 
-## Secrets
+## Secrets And Backups
 
-Never commit `.env`, Cloudflare tunnel tokens, Takeout exports, backups, database dumps, SSH keys or credentials. Use at least 32 random bytes for `SESSION_SECRET` and independent random PostgreSQL credentials.
+Excluded from Git: `.env`, private keys, GCP credentials, Takeout archives, database dumps, media backups and logs. Use independent random PostgreSQL/session secrets. Local backups inherit host permissions; any approved off-server copy should be encrypted and access-controlled.
+
+Restores are tested weekly in a temporary PostgreSQL database. A backup is not considered valid until `scripts/test-backups.sh` succeeds.

@@ -15,11 +15,8 @@ LOGIN_ATTEMPTS = 8
 
 
 def client_ip(request: Request) -> str:
-    return (
-        request.headers.get("cf-connecting-ip")
-        or request.headers.get("x-real-ip")
-        or (request.client.host if request.client else "unknown")
-    )
+    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+    return forwarded or request.headers.get("x-real-ip") or (request.client.host if request.client else "unknown")
 
 
 def verify_credentials(username: str, password: str, settings: Settings) -> bool:

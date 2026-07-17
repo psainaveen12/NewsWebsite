@@ -1,0 +1,56 @@
+name: Test and deploy GCP
+
+on:
+  push:
+    branches: [NewsWebsiteGCP]
+  workflow_dispatch:
+
+concurrency:
+  group: newswebsite-gcp-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+      - run: bash -n scripts/*.sh scripts/gcp/*.sh
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_HOST: ${{ secrets.GCP_SSH_HOST }}
+          SSH_PORT: ${{ secrets.GCP_SSH_PORT }}
+          SSH_PRIVATE_KEY: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.GCP_SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$SSH_HOST" && test -n "$SSH_PORT" && test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/known_hosts
+      - name: Deploy NewsWebsiteGCP
+        env:
+          SSH_HOST: ${{ secrets.GCP_SSH_HOST }}
+          SSH_PORT: ${{ secrets.GCP_SSH_PORT }}
+          SSH_USER: ${{ secrets.GCP_SSH_USER }}
+          DEPLOY_PATH: ${{ vars.GCP_DEPLOY_PATH }}
+        run: |
+          test -n "$SSH_USER"
+          REMOTE_PATH="${DEPLOY_PATH:-/opt/newswebsite}"
+          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "cd '$REMOTE_PATH' && DEPLOY_BRANCH=NewsWebsiteGCP bash scripts/deploy.sh NewsWebsiteGCP"

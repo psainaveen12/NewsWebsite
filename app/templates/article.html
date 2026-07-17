@@ -2,7 +2,8 @@
 {% from "_cards.html" import card %}
 {% from "_sidebar.html" import news_sidebar %}
 {% block head %}
-<script nonce="{{ csp_nonce }}" type="application/ld+json">{{ {'@context':'https://schema.org','@type':'NewsArticle','headline':article.title,'description':article.summary,'datePublished':article.published_at.isoformat(),'dateModified':article.updated_at.isoformat(),'author':{'@type':'Person','name':article.author_name},'mainEntityOfPage':canonical,'image':article.featured_image}|tojson }}</script>
+<script nonce="{{ csp_nonce }}" type="application/ld+json">{{ {'@context':'https://schema.org','@type':'NewsArticle','headline':article.title,'description':article.summary,'datePublished':article.published_at.isoformat(),'dateModified':article.updated_at.isoformat(),'author':{'@type':'Person','name':article.author_name},'publisher':{'@type':'Organization','name':site_name,'logo':{'@type':'ImageObject','url':base_url ~ url_for('static', path='/news-logo.png')}},'mainEntityOfPage':canonical,'image':(article.featured_image if article.featured_image.startswith('http') else base_url ~ article.featured_image) if article.featured_image else none}|tojson }}</script>
+<script nonce="{{ csp_nonce }}" type="application/ld+json">{{ {'@context':'https://schema.org','@type':'BreadcrumbList','itemListElement':[{'@type':'ListItem','position':1,'name':'Home','item':base_url + '/'},{'@type':'ListItem','position':2,'name':article.labels[0] if article.labels else 'News','item':base_url + '/label/' + (article.labels[0]|pathquote) if article.labels else base_url + '/'},{'@type':'ListItem','position':3,'name':article.title,'item':canonical}]}|tojson }}</script>
 {% endblock %}
 {% block content %}
 <div class="shell page-shell article-page"><div class="content-grid article-content-grid">
