@@ -1,0 +1,23 @@
+{% from "_cards.html" import image %}
+{% macro news_sidebar(popular, nav_labels) %}
+<aside class="sidebar">
+  <section class="follow-panel">
+    <div class="panel-title"><h2>Follow Us</h2><span></span></div>
+    <div class="social-grid">
+      <a class="facebook" href="https://www.facebook.com" target="_blank" rel="noopener noreferrer"><b>f</b><span>Facebook</span></a>
+      <a class="twitter" href="https://twitter.com" target="_blank" rel="noopener noreferrer"><b>𝕏</b><span>Twitter</span></a>
+      <a class="youtube" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer"><b>▶</b><span>YouTube</span></a>
+      <a class="instagram" href="https://www.instagram.com" target="_blank" rel="noopener noreferrer"><b>◎</b><span>Instagram</span></a>
+    </div>
+  </section>
+  {% if popular %}
+  <section class="popular-panel">
+    <div class="panel-title"><h2>Popular Posts</h2><span></span></div>
+    {% for item in popular %}<article class="popular-item"><a class="popular-image" href="/article/{{ item.slug }}">{{ image(item) }}</a><div><h3><a href="/article/{{ item.slug }}">{{ item.title }}</a></h3><time>{{ item.published_at|date }}</time></div></article>{% endfor %}
+  </section>
+  {% endif %}
+  {% if nav_labels %}
+  <section class="topic-panel"><div class="panel-title"><h2>Categories</h2><span></span></div><div class="topic-cloud">{% for label, count in nav_labels %}<a href="/label/{{ label|pathquote }}">{{ label }} <span>{{ count }}</span></a>{% endfor %}</div></section>
+  {% endif %}
+</aside>
+{% endmacro %}

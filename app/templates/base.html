@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#16161a">
+  <meta name="theme-color" content="#fd3a13">
   <meta name="description" content="{{ description|default('Independent news, technology, business, politics and world coverage.', true) }}">
   {% if settings.google_site_verification %}<meta name="google-site-verification" content="{{ settings.google_site_verification }}">{% endif %}
   <title>{{ title }}{% if title != site_name %} | {{ site_name }}{% endif %}</title>
@@ -11,7 +11,7 @@
   <link rel="alternate" type="application/rss+xml" title="{{ site_name }} RSS" href="/feed.xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,500;8..60,650;8..60,750&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v={{ settings.asset_version }}">
   <meta property="og:site_name" content="{{ site_name }}">
   <meta property="og:title" content="{{ title }}">
@@ -33,15 +33,11 @@
       <button class="icon-button mobile-toggle" type="button" aria-label="Open menu" aria-controls="primary-nav" aria-expanded="false" data-menu-toggle>
         <span></span><span></span><span></span>
       </button>
-      <a class="brand" href="/" aria-label="{{ site_name }} home"><span>News</span><i></i></a>
+      <a class="brand" href="/" aria-label="{{ site_name }} home"><img src="{{ url_for('static', path='/news-logo.png') }}" alt="{{ site_name }}"></a>
       <nav id="primary-nav" class="primary-nav" aria-label="Primary navigation">
         <a href="/">Home</a>
         <a href="/search">Features</a>
-        {% if nav_labels %}
-          {% for label, count in nav_labels %}<a href="/label/{{ label|pathquote }}">{{ label }}</a>{% endfor %}
-        {% else %}
-          {% for label in ['Politics','Business','Money','Sports','Laptops','Gadgets','Reviews','Mobile','Consoles'] %}<a href="/label/{{ label }}">{{ label }}</a>{% endfor %}
-        {% endif %}
+        {% for label in ['Politics','Business','Money','Sports','Laptops','Gadgets','Reviews','Mobile','Consoles'] %}<a href="/label/{{ label }}">{{ label }}</a>{% endfor %}
       </nav>
       <div class="header-actions">
         <button class="theme-toggle" type="button" aria-label="Toggle dark mode" data-theme-toggle><span class="sun">☼</span><span class="moon">●</span></button>
@@ -67,7 +63,7 @@
 
   <footer class="site-footer">
     <div class="shell footer-top">
-      <div class="footer-brand"><a class="brand brand-inverse" href="/"><span>News</span><i></i></a><p>Independent reporting on the stories shaping our world, technology and daily life.</p></div>
+      <div class="footer-brand"><a class="brand brand-inverse" href="/"><img src="{{ url_for('static', path='/news-logo.png') }}" alt="{{ site_name }}"></a><p>Independent reporting on the stories shaping our world, technology and daily life.</p></div>
       <div><h2>Explore</h2><a href="/search">All stories</a><a href="/feed.xml">RSS feed</a><a href="/sitemap.xml">Sitemap</a></div>
       <div><h2>Information</h2><a href="/p/about-us">About Us</a><a href="/p/contact-us">Contact</a><a href="/p/editorial-policy">Editorial Policy</a></div>
       <div><h2>Legal</h2><a href="/p/privacy-policy">Privacy Policy</a><a href="/p/terms-and-conditions">Terms</a><a href="/p/disclaimer">Disclaimer</a></div>

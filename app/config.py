@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     app_base_url: str = "http://localhost"
     app_domain: str = "news.ieltstask.com"
     site_name: str = "News"
-    asset_version: str = "2026.07.16.2"
+    asset_version: str = "2026.07.16.4"
     database_url: str = "sqlite:///./data/news.db"
     data_dir: Path = Path("data")
     session_secret: str = Field(default="development-only-session-secret-change-me", min_length=32)

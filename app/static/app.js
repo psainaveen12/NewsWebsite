@@ -2,8 +2,7 @@
   const root = document.documentElement;
   const themeButton = document.querySelector('[data-theme-toggle]');
   const savedTheme = localStorage.getItem('news-theme');
-  const preferredDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  root.dataset.theme = savedTheme || (preferredDark ? 'dark' : 'light');
+  root.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
 
   themeButton?.addEventListener('click', () => {
     root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';

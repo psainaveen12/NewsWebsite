@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% from "_cards.html" import card, image %}
+{% from "_sidebar.html" import news_sidebar %}
 {% block content %}
 <div class="shell page-shell">
   {% if featured %}
-  <section class="hero-section" aria-labelledby="top-stories-title">
-    <div class="section-heading"><div><span>Today</span><h1 id="top-stories-title">Top stories</h1></div><a href="/search">View all <b>→</b></a></div>
+  <section class="hero-section" aria-label="Featured stories">
     <div class="hero-grid{% if featured|length == 1 %} hero-solo{% endif %}">
       <article class="hero-lead">
         <a class="hero-link" href="/article/{{ featured[0].slug }}">
@@ -18,7 +18,7 @@
         </a>
       </article>
       {% if featured|length > 1 %}<div class="hero-side">
-        {% for item in featured[1:5] %}
+        {% for item in featured[1:4] %}
         <article class="hero-mini">
           <a href="/article/{{ item.slug }}">{{ image(item, 'mini-image') }}<div class="hero-overlay"></div><div class="mini-copy">{% if item.labels %}<span>{{ item.labels[0] }}</span>{% endif %}<h2>{{ item.title }}</h2></div></a>
         </article>
@@ -30,7 +30,7 @@
 
   <div class="content-grid">
     <section class="latest" aria-labelledby="latest-title">
-      <div class="section-heading compact"><div><span>Newsroom</span><h2 id="latest-title">Latest stories</h2></div></div>
+      <div class="section-heading compact"><div><h2 id="latest-title">Latest News</h2></div><a href="/search">View all</a></div>
       {% if articles %}
         <div class="story-list">{% for item in articles %}{{ card(item, 'list-card') }}{% endfor %}</div>
       {% else %}
@@ -44,11 +44,7 @@
       </nav>
       {% endif %}
     </section>
-    <aside class="sidebar">
-      <section class="follow-panel"><span class="panel-eyebrow">Stay informed</span><h2>News, without the noise.</h2><p>Follow the latest reporting across world news, technology, politics and business.</p><a href="/feed.xml">Follow via RSS <b>↗</b></a></section>
-      {% if popular %}<section class="popular-panel"><div class="panel-title"><h2>Popular posts</h2><span></span></div>{% for item in popular %}<article class="popular-item"><span>{{ '%02d'|format(loop.index) }}</span><div><h3><a href="/article/{{ item.slug }}">{{ item.title }}</a></h3><time>{{ item.published_at|date }}</time></div></article>{% endfor %}</section>{% endif %}
-      {% if nav_labels %}<section class="topic-panel"><div class="panel-title"><h2>Browse topics</h2><span></span></div><div class="topic-cloud">{% for label, count in nav_labels %}<a href="/label/{{ label|pathquote }}">{{ label }} <span>{{ count }}</span></a>{% endfor %}</div></section>{% endif %}
-    </aside>
+    {{ news_sidebar(popular, nav_labels) }}
   </div>
 </div>
 {% endblock %}

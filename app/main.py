@@ -175,6 +175,7 @@ def article_page(slug: str, request: Request, session: Session = Depends(get_db)
             article=article,
             comments=comments,
             related=related,
+            popular=popular_posts(session),
             canonical=f"{settings.app_base_url}/article/{article.slug}",
         ),
     )
